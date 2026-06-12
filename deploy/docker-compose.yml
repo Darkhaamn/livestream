@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: livestream
+      POSTGRES_PASSWORD: livestream_secret
+      POSTGRES_DB: livestream
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U livestream"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass redis_secret
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_secret", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: mediamtx
+    ports:
+      - '1935:1935' # RTMP
+      - '8554:8554' # RTSP
+      - '8888:8888' # HLS
+      - '8889:8889' # WebRTC
+      - '8189:8189/udp' # WebRTC ICE
+      - '9997:9997' # MediaMTX API
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml
+      - ../recordings:/recordings
+      - ../thumbnails:/thumbnails
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  postgres_data:
+  redis_data:

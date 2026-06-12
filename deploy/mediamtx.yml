@@ -1,0 +1,81 @@
+logLevel: info
+
+api: yes
+apiAddress: :9997
+
+metrics: yes
+metricsAddress: :9998
+
+authMethod: http
+authHTTPAddress: http://host.docker.internal:8081/internal/mtx/auth
+# Don't require auth for local API/metrics/pprof (mtx-manager uses the local API)
+authHTTPExclude:
+  - action: api
+  - action: metrics
+  - action: pprof
+
+# Internal user list unused with HTTP auth:
+# authInternalUsers:
+#   - user: any
+#     pass:
+#     ips: []
+#     permissions:
+#       - action: publish
+#       - action: read
+#       - action: playback
+#   - user: admin
+#     pass: admin123
+#     ips: []
+#     permissions:
+#       - action: api
+#       - action: metrics
+
+hls: yes
+hlsAddress: :8888
+# Trust nginx/docker proxy so remoteAddr uses X-Forwarded-For (real viewer IP)
+hlsTrustedProxies:
+  - 127.0.0.1
+  - 172.17.0.0/16
+  - 172.18.0.0/16
+
+# Stable HLS for browser, iOS, CDN
+hlsVariant: mpegts
+hlsSegmentCount: 6
+hlsSegmentDuration: 2s
+
+webrtc: yes
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :8189
+
+# For local test
+webrtcAdditionalHosts:
+  - localhost
+  - 127.0.0.1
+
+pathDefaults:
+  source: publisher
+
+  # Notify API of stream start, then run periodic JPEG snapshots for homepage
+  # thumbnails (requires ffmpeg; mtx-manager also captures)
+  runOnReady: |
+    bash -c '
+    curl -s -X POST http://host.docker.internal:8081/internal/mtx/stream-started -H "Content-Type: application/json" -d "{\"path\":\"$MTX_PATH\"}"
+    command -v ffmpeg >/dev/null || exit 0
+    while [ -n "$MTX_PATH" ]; do
+      mkdir -p "/thumbnails/$(dirname "$MTX_PATH")"
+      ffmpeg -hide_banner -loglevel error -rtsp_transport tcp \
+        -i "rtsp://127.0.0.1:8554/$MTX_PATH" \
+        -frames:v 1 -update 1 -y "/thumbnails/${MTX_PATH}.jpg" 2>/dev/null || true
+      sleep 10
+    done
+    '
+  runOnReadyRestart: no
+  runOnNotReady: curl -s -X POST http://host.docker.internal:8081/internal/mtx/stream-stopped -H 'Content-Type: application/json' -d '{"path":"$MTX_PATH"}'
+  record: yes
+  recordPath: /recordings/%path/%Y/%m/%d/%H-%M-%S
+  recordFormat: fmp4
+  recordSegmentDuration: 1h
+  recordDeleteAfter: 0s
+
+paths:
+  all_others:

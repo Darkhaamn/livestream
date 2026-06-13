@@ -1,8 +1,19 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { IconCheck } from "@tabler/icons-react"
+import { useState } from "react"
 
-import { api } from "@/lib/api"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { api, type User } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
 import { cn } from "@/lib/utils"
 
@@ -12,24 +23,31 @@ type StreamInfoEditorProps = {
   onSaved?: () => void
 }
 
-export function StreamInfoEditor({ className, compact = false, onSaved }: StreamInfoEditorProps) {
-  const { user, accessToken, refreshUser } = useAuth()
-  const [title, setTitle] = useState("")
-  const [category, setCategory] = useState("")
-  const [description, setDescription] = useState("")
+type StreamInfoEditorFormProps = {
+  user: User
+  accessToken: string
+  compact: boolean
+  className?: string
+  onSaved?: () => void
+  refreshUser: () => Promise<void>
+}
+
+function StreamInfoEditorForm({
+  user,
+  accessToken,
+  compact,
+  className,
+  onSaved,
+  refreshUser,
+}: StreamInfoEditorFormProps) {
+  const [title, setTitle] = useState(user.stream_title ?? "")
+  const [category, setCategory] = useState(user.stream_category ?? "")
+  const [description, setDescription] = useState(user.stream_description ?? "")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!user) return
-    setTitle(user.stream_title ?? "")
-    setCategory(user.stream_category ?? "")
-    setDescription(user.stream_description ?? "")
-  }, [user])
-
   async function handleSave() {
-    if (!accessToken) return
     setSaving(true)
     setSaved(false)
     setError(null)
@@ -50,73 +68,84 @@ export function StreamInfoEditor({ className, compact = false, onSaved }: Stream
     }
   }
 
-  if (!user) return null
-
   return (
-    <div className={cn("space-y-4", className)}>
+    <FieldGroup className={className}>
       {!compact ? (
-        <p className="text-sm text-muted-foreground">
+        <FieldDescription>
           Shown to viewers on your channel and browse pages. Updates apply immediately while live.
-        </p>
+        </FieldDescription>
       ) : null}
 
       {error ? (
-        <p className="text-sm text-destructive">{error}</p>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       ) : null}
 
-      <div className="space-y-3">
-        <div className="space-y-1.5">
-          <label htmlFor="stream-info-title" className="text-xs font-medium text-muted-foreground">
-            Title
-          </label>
-          <input
-            id="stream-info-title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="What are you streaming?"
-            maxLength={100}
-            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary"
-          />
-        </div>
+      <Field data-invalid={!!error}>
+        <FieldLabel htmlFor="stream-info-title">Title</FieldLabel>
+        <Input
+          id="stream-info-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="What are you streaming?"
+          maxLength={100}
+          aria-invalid={!!error}
+        />
+      </Field>
 
-        <div className="space-y-1.5">
-          <label htmlFor="stream-info-category" className="text-xs font-medium text-muted-foreground">
-            Category
-          </label>
-          <input
-            id="stream-info-category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="e.g. Just Chatting"
-            maxLength={50}
-            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary"
-          />
-        </div>
+      <Field>
+        <FieldLabel htmlFor="stream-info-category">Category</FieldLabel>
+        <Input
+          id="stream-info-category"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          placeholder="e.g. Just Chatting"
+          maxLength={50}
+        />
+      </Field>
 
-        <div className="space-y-1.5">
-          <label htmlFor="stream-info-description" className="text-xs font-medium text-muted-foreground">
-            Description
-          </label>
-          <textarea
-            id="stream-info-description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Tell viewers what this stream is about…"
-            maxLength={500}
-            rows={compact ? 3 : 4}
-            className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary"
-          />
-        </div>
-      </div>
+      <Field>
+        <FieldLabel htmlFor="stream-info-description">Description</FieldLabel>
+        <Textarea
+          id="stream-info-description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Tell viewers what this stream is about…"
+          maxLength={500}
+          rows={compact ? 3 : 4}
+          className="min-h-0 resize-y"
+        />
+      </Field>
 
-      <button
-        type="button"
-        onClick={() => void handleSave()}
-        disabled={saving}
-        className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-      >
-        {saving ? "Saving…" : saved ? "Saved" : "Save stream info"}
-      </button>
-    </div>
+      <Button type="button" onClick={() => void handleSave()} disabled={saving}>
+        {saving ? "Saving…" : saved ? (
+          <>
+            <IconCheck data-icon="inline-start" />
+            Saved
+          </>
+        ) : (
+          "Save stream info"
+        )}
+      </Button>
+    </FieldGroup>
+  )
+}
+
+export function StreamInfoEditor({ className, compact = false, onSaved }: StreamInfoEditorProps) {
+  const { user, accessToken, refreshUser } = useAuth()
+
+  if (!user || !accessToken) return null
+
+  return (
+    <StreamInfoEditorForm
+      key={user.id}
+      user={user}
+      accessToken={accessToken}
+      compact={compact}
+      className={cn(className)}
+      onSaved={onSaved}
+      refreshUser={refreshUser}
+    />
   )
 }

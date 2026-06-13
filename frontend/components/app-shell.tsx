@@ -17,6 +17,19 @@ import { useEffect, useState } from 'react'
 
 import { AuthModal } from '@/components/auth/auth-modal'
 import { AppSidebar } from '@/components/app-sidebar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '@/components/ui/input-group'
 import { useAuth } from '@/lib/auth-context'
 
 type AppShellProps = { children: React.ReactNode }
@@ -27,7 +40,6 @@ export default function AppShell({ children }: AppShellProps) {
   const [themeMounted, setThemeMounted] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
   const [authTab, setAuthTab] = useState<'login' | 'register'>('login')
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   const openLogin = () => { setAuthTab('login'); setAuthOpen(true) }
   const openRegister = () => { setAuthTab('register'); setAuthOpen(true) }
@@ -55,14 +67,12 @@ export default function AppShell({ children }: AppShellProps) {
 
           {/* Search (decorative) */}
           <div className="hidden flex-1 justify-center md:flex">
-            <div className="flex w-full max-w-md items-center gap-2 rounded-md bg-input px-3 py-1.5">
-              <IconSearch className="size-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search"
-                className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
-              />
-            </div>
+            <InputGroup className="max-w-md bg-input">
+              <InputGroupAddon align="inline-start">
+                <IconSearch />
+              </InputGroupAddon>
+              <InputGroupInput type="search" placeholder="Search" />
+            </InputGroup>
           </div>
 
           {/* Right actions */}
@@ -71,74 +81,62 @@ export default function AppShell({ children }: AppShellProps) {
               <>
                 {user ? (
                   <>
-                    <Link
-                      href="/broadcast"
-                      className="flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-                    >
-                      <IconBroadcast className="size-4" />
-                      Go Live
-                    </Link>
-                    <div className="relative">
-                      <button
-                        onClick={() => setUserMenuOpen(o => !o)}
-                        className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      >
-                        <div className="flex size-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                          {(user.display_name ?? user.username).charAt(0).toUpperCase()}
-                        </div>
-                        <span className="text-foreground">{user.display_name ?? user.username}</span>
-                        <IconChevronDown className="size-3 opacity-50" />
-                      </button>
-                      {userMenuOpen && (
-                        <div className="absolute right-0 top-full mt-1 w-48 rounded-lg border border-border bg-popover p-1 shadow-xl">
-                          <Link
-                            href={`/${user.username}`}
-                            onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-                          >
-                            <IconUser className="size-4" />
+                    <Button size="lg" className="rounded-lg" asChild>
+                      <Link href="/broadcast">
+                        <IconBroadcast data-icon="inline-start" />
+                        Go Live
+                      </Link>
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="gap-1.5 px-2">
+                          <Avatar className="size-7">
+                            <AvatarFallback className="bg-primary text-xs font-bold text-primary-foreground">
+                              {(user.display_name ?? user.username).charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span>{user.display_name ?? user.username}</span>
+                          <IconChevronDown className="opacity-50" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem asChild>
+                          <Link href={`/${user.username}`}>
+                            <IconUser data-icon="inline-start" />
                             Channel
                           </Link>
-                          <button
-                            onClick={() => { logout(); setUserMenuOpen(false) }}
-                            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-                          >
-                            <IconLogout className="size-4" />
-                            Log out
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => void logout()}>
+                          <IconLogout data-icon="inline-start" />
+                          Log out
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </>
                 ) : (
                   <>
-                    <button
-                      onClick={openLogin}
-                      className="h-8 rounded-lg bg-secondary px-3 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
-                    >
+                    <Button variant="secondary" size="lg" className="rounded-lg" onClick={openLogin}>
                       Log in
-                    </button>
-                    <button
-                      onClick={openRegister}
-                      className="h-8 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-                    >
+                    </Button>
+                    <Button size="lg" className="rounded-lg" onClick={openRegister}>
                       Sign up
-                    </button>
+                    </Button>
                   </>
                 )}
               </>
             )}
 
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={toggleTheme}
               aria-label="Toggle theme"
-              className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               {themeMounted
-                ? (resolvedTheme === 'dark' ? <IconSun className="size-4" /> : <IconMoon className="size-4" />)
+                ? (resolvedTheme === 'dark' ? <IconSun /> : <IconMoon />)
                 : <span className="size-4" aria-hidden />}
-            </button>
+            </Button>
           </nav>
         </div>
       </header>

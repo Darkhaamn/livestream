@@ -8,12 +8,12 @@ import { VodPlayOverlay, VodThumbnail } from "@/components/stream/vod-thumbnail"
 import { api, type StreamSession, type User } from "@/lib/api"
 import type { Vod } from "@/lib/mtx-api"
 import { formatSessionDuration } from "@/lib/time-format"
+import { cn } from "@/lib/utils"
 import {
   sessionToVod,
   sessionsWithRecordings,
   usernameFromStreamKey,
 } from "@/lib/vod-session"
-import { cn } from "@/lib/utils"
 
 type VodListProps = {
   streamKey: string
@@ -155,9 +155,6 @@ export function VodList({
                     {duration}
                   </span>
                 ) : null}
-                <span className="absolute bottom-2 left-2 rounded bg-[#eb0400]/90 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-white">
-                  REC
-                </span>
               </div>
 
               <div className="flex items-start gap-2 p-3">

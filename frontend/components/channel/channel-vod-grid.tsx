@@ -5,8 +5,8 @@ import { VodPlayOverlay, VodThumbnail } from "@/components/stream/vod-thumbnail"
 import type { StreamSession, User } from "@/lib/api"
 import type { Vod } from "@/lib/mtx-api"
 import { formatRelativeTime, formatSessionDuration } from "@/lib/time-format"
-import { sessionToVod, sessionsWithRecordings } from "@/lib/vod-session"
 import { cn } from "@/lib/utils"
+import { sessionToVod, sessionsWithRecordings } from "@/lib/vod-session"
 
 type ChannelVodGridProps = {
   sessions: StreamSession[]
@@ -93,9 +93,6 @@ export function ChannelVodGrid({
                     {duration}
                   </span>
                 ) : null}
-                <span className="absolute bottom-2 left-2 rounded bg-[#eb0400]/90 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-white">
-                  REC
-                </span>
               </div>
 
               <div className="flex items-start gap-3 p-4">

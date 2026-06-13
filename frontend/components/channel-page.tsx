@@ -10,7 +10,9 @@ import { ChannelAvatar } from '@/components/stream/channel-avatar'
 import { ChatPanel } from '@/components/stream/chat-panel'
 import { LiveBadge } from '@/components/stream/live-badge'
 import { StreamInfoEditor } from '@/components/stream/stream-info-editor'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api, type StreamSession, type User } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { Vod } from '@/lib/mtx-api'
@@ -190,7 +192,11 @@ export default function ChannelPage({ username }: ChannelPageProps) {
   }
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] bg-background">
+    <Tabs
+      value={tab}
+      onValueChange={(value) => setTab(value as ChannelTab)}
+      className="min-h-[calc(100vh-3.5rem)] bg-background"
+    >
       {/* Player stage */}
       <section className="border-b border-border bg-black">
         <div className="mx-auto flex max-w-[1600px] flex-col lg:flex-row">
@@ -296,51 +302,42 @@ export default function ChannelPage({ username }: ChannelPageProps) {
             </div>
 
             {!isOwnChannel ? (
-              <button
+              <Button
                 type="button"
+                variant={following ? 'secondary' : 'default'}
+                size="lg"
+                className="w-full gap-2 font-bold sm:w-auto"
                 onClick={() => void toggleFollow()}
                 disabled={followBusy || !accessToken}
                 title={!accessToken ? 'Log in to follow' : undefined}
-                className={cn(
-                  'inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-sm font-bold transition-colors disabled:opacity-60 sm:w-auto',
-                  following
-                    ? 'bg-muted text-foreground hover:bg-accent'
-                    : 'bg-primary text-primary-foreground hover:bg-primary/90',
-                )}
               >
-                <IconHeart className={cn('size-4', following && 'fill-current')} />
+                <IconHeart className={cn(following && 'fill-current')} />
                 {following ? 'Following' : 'Follow'}
-              </button>
+              </Button>
             ) : null}
           </div>
 
-          <nav className="-mx-1 flex gap-1 overflow-x-auto border-t border-border px-1 pt-1">
+          <TabsList
+            variant="line"
+            className="h-auto w-full justify-start rounded-none border-t border-border bg-transparent p-0"
+          >
             {TABS.map(item => (
-              <button
+              <TabsTrigger
                 key={item.id}
-                type="button"
-                onClick={() => setTab(item.id)}
-                className={cn(
-                  'relative shrink-0 px-4 py-3.5 text-sm font-semibold transition-colors',
-                  tab === item.id
-                    ? 'text-foreground'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
+                value={item.id}
+                className="rounded-none px-4 py-3.5 text-sm font-semibold after:bg-primary"
               >
                 {item.label}
-                {tab === item.id ? (
-                  <span className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-primary" />
-                ) : null}
-              </button>
+              </TabsTrigger>
             ))}
-          </nav>
+          </TabsList>
         </div>
       </section>
 
       {/* Tab content */}
       <section className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6 md:py-10">
-        {tab === 'home' ? (
-          <div className="space-y-10">
+        <TabsContent value="home" className="mt-0">
+          <div className="flex flex-col gap-10">
             {isOwnChannel && user.is_live ? (
               <div className="rounded-xl border border-border bg-card p-6">
                 <h2 className="text-base font-bold text-foreground">Edit stream info</h2>
@@ -370,10 +367,10 @@ export default function ChannelPage({ username }: ChannelPageProps) {
               />
             ) : null}
           </div>
-        ) : null}
+        </TabsContent>
 
-        {tab === 'videos' ? (
-          user.is_live ? (
+        <TabsContent value="videos" className="mt-0">
+          {user.is_live ? (
             <div className="rounded-xl border border-border bg-card px-6 py-14 text-center">
               <p className="text-sm text-muted-foreground">
                 Past broadcasts will appear here after the stream ends.
@@ -388,10 +385,10 @@ export default function ChannelPage({ username }: ChannelPageProps) {
               title="All stream videos"
               emptyMessage="No stream recordings yet"
             />
-          )
-        ) : null}
+          )}
+        </TabsContent>
 
-        {tab === 'about' ? (
+        <TabsContent value="about" className="mt-0">
           <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
             <div className="rounded-xl border border-border bg-card p-6 md:p-8">
               <h2 className="text-lg font-bold text-foreground">About {name}</h2>
@@ -430,8 +427,8 @@ export default function ChannelPage({ username }: ChannelPageProps) {
               </dl>
             </div>
           </div>
-        ) : null}
+        </TabsContent>
       </section>
-    </div>
+    </Tabs>
   )
 }

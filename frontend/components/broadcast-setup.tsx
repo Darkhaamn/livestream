@@ -5,9 +5,9 @@ import {
   IconBroadcast,
   IconCheck,
   IconCopy,
+  IconExternalLink,
   IconEye,
   IconEyeOff,
-  IconExternalLink,
   IconSettings,
   IconUser,
 } from "@tabler/icons-react"
@@ -17,6 +17,7 @@ import { useEffect, useState } from "react"
 import BroadcastLiveStats from "@/components/broadcast-live-stats"
 import BroadcastStability from "@/components/broadcast-stability"
 import { StreamInfoEditor } from "@/components/stream/stream-info-editor"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -26,6 +27,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Field,
+  FieldLabel,
+} from "@/components/ui/field"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { api } from "@/lib/api"
@@ -54,41 +65,33 @@ function CopyField({
   const masked = mask && !revealed
 
   return (
-    <div className="flex flex-col gap-2">
-      <label className="text-sm font-medium text-foreground">{label}</label>
-      <div className="flex gap-2">
-        <div className="relative min-w-0 flex-1">
-          <input
-            readOnly
-            type={masked ? "password" : "text"}
-            value={value}
-            className="h-10 w-full rounded-lg border border-border bg-muted/40 px-3 pr-3 font-mono text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-          />
-        </div>
+    <Field>
+      <FieldLabel>{label}</FieldLabel>
+      <InputGroup className="h-9 font-mono">
+        <InputGroupInput readOnly type={masked ? "password" : "text"} value={value} />
         {mask ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="size-10 shrink-0"
-            onClick={() => setRevealed((r) => !r)}
-          >
-            {revealed ? <IconEyeOff className="size-4" /> : <IconEye className="size-4" />}
-            <span className="sr-only">{revealed ? "Hide" : "Reveal"}</span>
-          </Button>
+          <InputGroupAddon align="inline-end">
+            <InputGroupButton
+              size="icon-sm"
+              onClick={() => setRevealed((r) => !r)}
+              aria-label={revealed ? "Hide" : "Reveal"}
+            >
+              {revealed ? <IconEyeOff /> : <IconEye />}
+            </InputGroupButton>
+          </InputGroupAddon>
         ) : null}
-        <Button
-          type="button"
-          variant={copied ? "default" : "outline"}
-          size="icon"
-          className="size-10 shrink-0"
-          onClick={() => void handleCopy()}
-        >
-          {copied ? <IconCheck className="size-4" /> : <IconCopy className="size-4" />}
-          <span className="sr-only">{copied ? "Copied" : "Copy"}</span>
-        </Button>
-      </div>
-    </div>
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton
+            size="icon-sm"
+            variant={copied ? "default" : "ghost"}
+            onClick={() => void handleCopy()}
+            aria-label={copied ? "Copied" : "Copy"}
+          >
+            {copied ? <IconCheck /> : <IconCopy />}
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
+    </Field>
   )
 }
 
@@ -125,7 +128,8 @@ function deriveRtmpServer(rtmpBase: string | undefined) {
 export default function BroadcastSetup() {
   const { user, accessToken, isLoading, refreshUser } = useAuth()
   const [config, setConfig] = useState<BroadcastConfig | null>(null)
-  const [streamKey, setStreamKey] = useState("")
+  const [streamKeyOverride, setStreamKeyOverride] = useState<string | null>(null)
+  const [fallbackStreamKey, setFallbackStreamKey] = useState("")
   const [isLive, setIsLive] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -137,16 +141,20 @@ export default function BroadcastSetup() {
   }, [])
 
   useEffect(() => {
-    if (!user) return
-    if (user.stream_key) {
-      setStreamKey(user.stream_key)
-    } else if (accessToken) {
-      void api.users
-        .me(accessToken)
-        .then((me) => setStreamKey(me.stream_key ?? ""))
-        .catch(() => {})
+    if (!user || user.stream_key || !accessToken) return
+    let active = true
+    void api.users
+      .me(accessToken)
+      .then((me) => {
+        if (active) setFallbackStreamKey(me.stream_key ?? "")
+      })
+      .catch(() => { })
+    return () => {
+      active = false
     }
   }, [user, accessToken])
+
+  const streamKey = streamKeyOverride ?? user?.stream_key ?? fallbackStreamKey
 
   const username = user?.username ?? ""
   const streamPath = `live/${username}`
@@ -210,8 +218,9 @@ export default function BroadcastSetup() {
     setRegenerating(true)
     try {
       const { stream_key } = await api.users.regenerateStreamKey(accessToken)
-      setStreamKey(stream_key)
+      setStreamKeyOverride(stream_key)
       await refreshUser()
+      setStreamKeyOverride(null)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to regenerate stream key")
@@ -273,9 +282,9 @@ export default function BroadcastSetup() {
 
       <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6">
         {error ? (
-          <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
+          <Alert variant="destructive" className="mb-6">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         ) : null}
 
         <Tabs defaultValue="status" className="w-full">

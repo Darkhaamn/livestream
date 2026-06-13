@@ -1,24 +1,18 @@
 "use client"
 
 import Link from "next/link"
-import {
-  IconArrowUp,
-  IconEye,
-  IconRefresh,
-  IconVideo,
-} from "@tabler/icons-react"
+import { IconArrowUp, IconEye, IconRefresh, IconVideo } from "@tabler/icons-react"
 import { useEffect, useState } from "react"
 
 import { HealthBadge } from "@/components/stream/health-badge"
+import { StreamInfoEditor } from "@/components/stream/stream-info-editor"
+import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getPath } from "@/lib/mtx-api"
 import type { PathSummary } from "@/lib/mtx-types"
-import {
-  formatViewerCount,
-  getStreamHealth,
-  getStreamResolution,
-} from "@/lib/stream-health"
+import { formatViewerCount, getStreamHealth, getStreamResolution } from "@/lib/stream-health"
 import { formatBytes, formatMbps } from "@/lib/stream"
+import { cn } from "@/lib/utils"
 
 type BroadcastDashboardProps = {
   streamKey: string
@@ -38,15 +32,15 @@ function StatCard({
   highlight?: boolean
 }) {
   return (
-    <div className="rounded-lg bg-[#1c1c21] p-4">
-      <div className="mb-2 flex items-center gap-2 text-white/40">
+    <div className="surface-muted p-4">
+      <div className="mb-2 flex items-center gap-2 text-muted-foreground">
         <Icon className="size-4" />
         <span className="text-xs uppercase tracking-wide">{label}</span>
       </div>
-      <p className={`text-xl font-bold tracking-tight ${highlight ? "text-[#53fc18]" : ""}`}>
+      <p className={cn("text-xl font-bold tracking-tight text-foreground", highlight && "text-primary-text")}>
         {value}
       </p>
-      {sub ? <p className="mt-1 text-xs text-white/40">{sub}</p> : null}
+      {sub ? <p className="mt-1 text-xs text-muted-foreground">{sub}</p> : null}
     </div>
   )
 }
@@ -85,18 +79,18 @@ export default function BroadcastDashboard({ streamKey }: BroadcastDashboardProp
   const frameErrors = stream?.inboundFramesInError ?? 0
 
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-[#141417] p-5">
+    <div className="surface-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs font-bold tracking-widest text-white/40 uppercase">
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
           Stream health
         </p>
         <div className="flex items-center gap-2">
           {isLive ? (
-            <span className="inline-flex items-center rounded-full border border-[#53fc18]/30 bg-[#53fc18]/10 px-2.5 py-0.5 text-xs font-semibold text-[#53fc18]">
+            <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary-text">
               ● Live
             </span>
           ) : (
-            <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs font-semibold text-white/50">
+            <span className="inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
               Offline
             </span>
           )}
@@ -108,26 +102,24 @@ export default function BroadcastDashboard({ streamKey }: BroadcastDashboardProp
         {loading && !stream ? (
           <div className="grid gap-3 sm:grid-cols-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-24 rounded-lg bg-white/5" />
+              <Skeleton key={i} className="h-24 rounded-lg" />
             ))}
           </div>
         ) : (
           <>
             <div
-              className={`rounded-lg border p-4 ${
-                health.status === "healthy"
-                  ? "border-[#53fc18]/20 bg-[#53fc18]/5"
-                  : health.status === "critical"
-                    ? "border-[#eb0400]/30 bg-[#eb0400]/10"
-                    : health.status === "warning"
-                      ? "border-amber-500/20 bg-amber-500/5"
-                      : "border-white/[0.06] bg-[#1c1c21]"
-              }`}
+              className={cn(
+                "rounded-lg border p-4",
+                health.status === "healthy" && "border-primary/20 bg-primary/5",
+                health.status === "critical" && "border-destructive/30 bg-destructive/10",
+                health.status === "warning" && "border-amber-500/20 bg-amber-500/5",
+                health.status === "offline" && "surface-muted border-border",
+              )}
             >
-              <p className="text-sm font-semibold">{health.label}</p>
-              <p className="mt-1 text-sm text-white/50">{health.description}</p>
+              <p className="text-sm font-semibold text-foreground">{health.label}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{health.description}</p>
               {!isLive ? (
-                <p className="mt-3 text-xs text-white/40">
+                <p className="mt-3 text-xs text-muted-foreground">
                   Start streaming in OBS to see live metrics here.
                 </p>
               ) : null}
@@ -170,28 +162,32 @@ export default function BroadcastDashboard({ streamKey }: BroadcastDashboardProp
 
             {isLive ? (
               <>
-                <div className="h-px bg-white/[0.06]" />
+                <div className="h-px bg-border" />
+                <div>
+                  <p className="mb-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    Edit stream info
+                  </p>
+                  <StreamInfoEditor compact />
+                </div>
+                <div className="h-px bg-border" />
                 <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center rounded-md bg-black/40 px-2 py-0.5 font-mono text-xs text-white/70">
+                  <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs text-foreground">
                     {streamKey}
                   </span>
                   {stream?.members
-                    .filter((m) => m.state === "publish")
-                    .map((pub) => (
+                    .filter(m => m.state === "publish")
+                    .map(pub => (
                       <span
                         key={pub.id}
-                        className="inline-flex items-center rounded-md bg-white/10 px-2 py-0.5 text-xs text-white/70"
+                        className="inline-flex items-center rounded-md bg-accent px-2 py-0.5 text-xs text-muted-foreground"
                       >
                         {pub.device}
                       </span>
                     ))}
                 </div>
-                <Link
-                  href={`/watch/${encodeURIComponent(streamKey)}`}
-                  className="flex w-full items-center justify-center rounded-lg bg-[#53fc18] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[#46d614]"
-                >
-                  Open viewer page
-                </Link>
+                <Button asChild className="w-full">
+                  <Link href={`/watch/${encodeURIComponent(streamKey)}`}>Open viewer page</Link>
+                </Button>
               </>
             ) : null}
           </>

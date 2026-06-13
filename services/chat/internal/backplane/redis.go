@@ -129,4 +129,58 @@ func (b *RedisBackplane) PresenceCount(ctx context.Context, room string) (int, e
 	return int(n), err
 }
 
+func (b *RedisBackplane) ResetRoom(ctx context.Context, room string) error {
+	pipe := b.rdb.Pipeline()
+	pipe.Del(ctx, streamKey(room))
+	if _, err := pipe.Exec(ctx); err != nil {
+		return err
+	}
+	return b.Publish(ctx, room, message.NewClear(room, ""))
+}
+
+// --- Moderation (per channel owner) ---
+
+func banKey(owner string) string                 { return "chat:ban:" + owner }
+func timeoutKey(owner, username string) string   { return "chat:timeout:" + owner + ":" + username }
+func modKey(owner string) string                 { return "chat:mods:" + owner }
+
+func (b *RedisBackplane) IsBanned(ctx context.Context, owner, username string) (bool, error) {
+	banned, err := b.rdb.SIsMember(ctx, banKey(owner), username).Result()
+	if err != nil {
+		return false, err
+	}
+	if banned {
+		return true, nil
+	}
+	n, err := b.rdb.Exists(ctx, timeoutKey(owner, username)).Result()
+	return n > 0, err
+}
+
+func (b *RedisBackplane) SetBan(ctx context.Context, owner, username string, banned bool) error {
+	if banned {
+		return b.rdb.SAdd(ctx, banKey(owner), username).Err()
+	}
+	// Unban also clears any active timeout.
+	pipe := b.rdb.Pipeline()
+	pipe.SRem(ctx, banKey(owner), username)
+	pipe.Del(ctx, timeoutKey(owner, username))
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+func (b *RedisBackplane) SetTimeout(ctx context.Context, owner, username string, seconds int) error {
+	return b.rdb.Set(ctx, timeoutKey(owner, username), "1", time.Duration(seconds)*time.Second).Err()
+}
+
+func (b *RedisBackplane) IsMod(ctx context.Context, owner, username string) (bool, error) {
+	return b.rdb.SIsMember(ctx, modKey(owner), username).Result()
+}
+
+func (b *RedisBackplane) SetMod(ctx context.Context, owner, username string, isMod bool) error {
+	if isMod {
+		return b.rdb.SAdd(ctx, modKey(owner), username).Err()
+	}
+	return b.rdb.SRem(ctx, modKey(owner), username).Err()
+}
+
 func (b *RedisBackplane) Close() error { return b.rdb.Close() }

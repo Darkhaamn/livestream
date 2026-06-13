@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -20,6 +21,7 @@ type ChatMessage struct {
 	Username  string    `gorm:"size:64"`
 	Color     string    `gorm:"size:16"`
 	Text      string    `gorm:"size:500"`
+	Badges    string    `gorm:"size:128"` // JSON array, e.g. ["broadcaster"]
 	CreatedAt time.Time `gorm:"index:idx_chat_room_created,priority:2"`
 }
 
@@ -51,6 +53,11 @@ func (s *Store) Save(msg message.Message) {
 		Text:      msg.Text,
 		CreatedAt: msg.Timestamp,
 	}
+	if len(msg.Badges) > 0 {
+		if b, err := json.Marshal(msg.Badges); err == nil {
+			rec.Badges = string(b)
+		}
+	}
 	if err := s.db.Create(&rec).Error; err != nil {
 		log.Printf("chat store: save: %v", err)
 	}
@@ -71,6 +78,10 @@ func (s *Store) History(ctx context.Context, room string, limit int) []message.M
 	msgs := make([]message.Message, 0, len(recs))
 	for i := len(recs) - 1; i >= 0; i-- {
 		r := recs[i]
+		var badges []string
+		if r.Badges != "" {
+			_ = json.Unmarshal([]byte(r.Badges), &badges)
+		}
 		msgs = append(msgs, message.Message{
 			Type:      message.TypeChat,
 			Room:      r.Room,
@@ -78,8 +89,14 @@ func (s *Store) History(ctx context.Context, room string, limit int) []message.M
 			Username:  r.Username,
 			Color:     r.Color,
 			Text:      r.Text,
+			Badges:    badges,
 			Timestamp: r.CreatedAt,
 		})
 	}
 	return msgs
+}
+
+// ClearRoom deletes persisted chat history for a room.
+func (s *Store) ClearRoom(ctx context.Context, room string) error {
+	return s.db.WithContext(ctx).Where("room = ?", room).Delete(&ChatMessage{}).Error
 }

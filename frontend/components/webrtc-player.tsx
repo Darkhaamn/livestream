@@ -5,6 +5,11 @@ import { useEffect, useRef, useState } from "react"
 import LivePlyrPlayer from "@/components/player"
 import { PlayerOverlay } from "@/components/stream/player-overlay"
 import { useWebRtcLatency } from "@/hooks/use-webrtc-latency"
+import {
+  acquireWebRtcSession,
+  dropWebRtcSession,
+  type WebRtcLease,
+} from "@/lib/webrtc-session"
 import { cn } from "@/lib/utils"
 
 type WebRtcPlayerProps = {
@@ -12,32 +17,8 @@ type WebRtcPlayerProps = {
   fallbackSrc: string
   viewerCount?: number
   className?: string
-}
-
-function waitForIceGathering(peer: RTCPeerConnection) {
-  if (peer.iceGatheringState === "complete") {
-    return Promise.resolve()
-  }
-
-  return new Promise<void>((resolve) => {
-    const onStateChange = () => {
-      if (peer.iceGatheringState === "complete") {
-        peer.removeEventListener("icegatheringstatechange", onStateChange)
-        resolve()
-      }
-    }
-
-    peer.addEventListener("icegatheringstatechange", onStateChange)
-  })
-}
-
-function absoluteLocation(location: string, baseUrl: string) {
-  const base = new URL(baseUrl)
-  if (location.startsWith("/") && base.pathname.startsWith("/webrtc/")) {
-    return `${base.origin}/webrtc${location}`
-  }
-
-  return new URL(location, baseUrl).toString()
+  /** Hidden behind a VOD overlay — keeps connection alive, skips loading UI churn. */
+  suspended?: boolean
 }
 
 export default function WebRtcPlayer({
@@ -45,110 +26,70 @@ export default function WebRtcPlayer({
   fallbackSrc,
   viewerCount = 0,
   className,
+  suspended = false,
 }: WebRtcPlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
-  const sessionRef = useRef<string | null>(null)
+  const leaseRef = useRef<WebRtcLease | null>(null)
+  const suspendedRef = useRef(suspended)
   const [peer, setPeer] = useState<RTCPeerConnection | null>(null)
-  const [error, setError] = useState<{ src: string; message: string } | null>(null)
-  const [fallbackSrcUrl, setFallbackSrcUrl] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [useFallback, setUseFallback] = useState(false)
   const [connected, setConnected] = useState(false)
-  const useFallback = fallbackSrcUrl === src
   const latencyMs = useWebRtcLatency(peer)
 
+  suspendedRef.current = suspended
+
   useEffect(() => {
+    setUseFallback(false)
+    setError(null)
+    setConnected(false)
+
     const video = videoRef.current
-    if (!video || useFallback) return
+    if (!video) return
 
-    const abortController = new AbortController()
-    const media = new MediaStream()
-    const peer = new RTCPeerConnection()
-    setPeer(peer)
-    let closed = false
+    let cancelled = false
+    const lease = acquireWebRtcSession(src)
+    leaseRef.current = lease
+    setPeer(lease.peer)
 
-    const fail = (message: string) => {
-      if (closed) return
-      setError({ src, message })
-      setFallbackSrcUrl(src)
-    }
-
-    video.srcObject = media
     video.muted = true
+    video.srcObject = lease.media
 
-    peer.addTransceiver("video", { direction: "recvonly" })
-    peer.addTransceiver("audio", { direction: "recvonly" })
-
-    peer.addEventListener("track", (event) => {
-      media.addTrack(event.track)
+    if (lease.isConnected()) {
       setConnected(true)
       void video.play().catch(() => undefined)
-    })
-
-    peer.addEventListener("connectionstatechange", () => {
-      if (peer.connectionState === "connected") {
-        setConnected(true)
-      }
-      if (peer.connectionState === "failed") {
-        fail("WebRTC connection failed. Falling back to HLS.")
-      }
-    })
-
-    async function connect() {
-      try {
-        const offer = await peer.createOffer()
-        await peer.setLocalDescription(offer)
-        await waitForIceGathering(peer)
-
-        if (!peer.localDescription) {
-          throw new Error("WebRTC offer was not created")
-        }
-
-        const response = await fetch(src, {
-          method: "POST",
-          headers: {
-            Accept: "application/sdp",
-            "Content-Type": "application/sdp",
-          },
-          body: peer.localDescription.sdp,
-          signal: abortController.signal,
-        })
-
-        if (!response.ok) {
-          throw new Error(`WHEP returned ${response.status}`)
-        }
-
-        const location = response.headers.get("Location")
-        if (location) {
-          sessionRef.current = absoluteLocation(location, src)
-        }
-
-        const answer = await response.text()
-        await peer.setRemoteDescription({ type: "answer", sdp: answer })
-        setError((current) => (current?.src === src ? null : current))
-      } catch (err) {
-        if (abortController.signal.aborted) return
-        fail(err instanceof Error ? err.message : "WebRTC playback failed")
-      }
     }
 
-    void connect()
+    void lease
+      .waitConnected()
+      .then(() => {
+        if (cancelled) return
+        setConnected(true)
+        setError(null)
+        void video.play().catch(() => undefined)
+      })
+      .catch((err) => {
+        if (cancelled || suspendedRef.current) return
+        dropWebRtcSession(src)
+        leaseRef.current = null
+        setPeer(null)
+        video.srcObject = null
+        const message = err instanceof Error ? err.message : "WebRTC playback failed"
+        setError(message)
+        setUseFallback(true)
+      })
 
     return () => {
-      closed = true
-      abortController.abort()
+      cancelled = true
+      lease.release()
+      leaseRef.current = null
       setPeer(null)
-      const session = sessionRef.current
-      sessionRef.current = null
-
-      if (session) {
-        void fetch(session, { method: "DELETE" }).catch(() => undefined)
+      if (video.srcObject === lease.media) {
+        video.srcObject = null
       }
-
-      peer.close()
-      media.getTracks().forEach((track) => track.stop())
-      video.srcObject = null
       setConnected(false)
     }
-  }, [src, useFallback])
+  }, [src])
 
   if (useFallback) {
     return (
@@ -156,12 +97,12 @@ export default function WebRtcPlayer({
         src={fallbackSrc}
         viewerCount={viewerCount}
         className={className}
-        fallbackNotice={
-          error?.src === src ? `WebRTC unavailable: ${error.message}` : undefined
-        }
+        fallbackNotice={error ? `WebRTC unavailable: ${error}` : undefined}
       />
     )
   }
+
+  const showConnecting = !connected && !suspended
 
   return (
     <div
@@ -185,17 +126,17 @@ export default function WebRtcPlayer({
           latencyMs={latencyMs}
           protocol="webrtc"
         />
-      ) : (
+      ) : showConnecting ? (
         <div className="absolute inset-0 flex items-center justify-center bg-black/80">
           <div className="flex flex-col items-center gap-3">
             <div className="size-8 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
             <p className="text-sm text-white/70">Connecting to stream…</p>
           </div>
         </div>
-      )}
-      {error?.src === src ? (
+      ) : null}
+      {error && !suspended ? (
         <div className="absolute inset-0 flex items-center justify-center bg-black/90 px-4 text-center text-sm text-destructive">
-          {error.message}
+          {error}
         </div>
       ) : null}
     </div>

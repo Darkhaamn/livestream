@@ -1,14 +1,24 @@
 const CHAT_BASE = process.env.NEXT_PUBLIC_CHAT_URL ?? 'ws://localhost:8082'
 
-export type ChatMessageType = 'chat' | 'system' | 'join' | 'leave' | 'error'
+export type ChatMessageType =
+  | 'chat'
+  | 'system'
+  | 'join'
+  | 'leave'
+  | 'error'
+  | 'clear'
+  | 'delete'
 
 export interface ChatMessage {
   type: ChatMessageType
+  id?: string
   room: string
   user_id?: string
   username?: string
   color?: string
   text?: string
+  badges?: string[]
+  target?: string // username (clear) or message id (delete)
   timestamp: string
 }
 

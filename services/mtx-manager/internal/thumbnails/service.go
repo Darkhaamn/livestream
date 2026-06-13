@@ -189,3 +189,74 @@ func (s *Service) runFFmpeg(ctx context.Context, input string) ([]byte, error) {
 	}
 	return stdout.Bytes(), nil
 }
+
+func (s *Service) vodDiskPath(recordingID string) string {
+	id := filepath.ToSlash(filepath.Clean(recordingID))
+	id = strings.TrimSuffix(id, filepath.Ext(id))
+	return filepath.Join(s.dir, "vods", id+".jpg")
+}
+
+// EnsureVOD extracts a JPEG thumbnail from a finished recording and caches it on disk.
+func (s *Service) EnsureVOD(recordingID, videoAbsPath string) error {
+	diskPath := s.vodDiskPath(recordingID)
+	if data, err := os.ReadFile(diskPath); err == nil && len(data) > 0 {
+		return nil
+	}
+	if s.ffmpegBin == "" {
+		return ErrNotFound
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	data, err := s.captureFromFile(ctx, videoAbsPath)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(diskPath), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(diskPath, data, 0o644)
+}
+
+// GetVOD returns a cached VOD thumbnail, generating it from the recording if needed.
+func (s *Service) GetVOD(recordingID, videoAbsPath string) ([]byte, error) {
+	if err := s.EnsureVOD(recordingID, videoAbsPath); err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(s.vodDiskPath(recordingID))
+	if err != nil || len(data) == 0 {
+		return nil, ErrNotFound
+	}
+	return data, nil
+}
+
+func (s *Service) captureFromFile(ctx context.Context, videoPath string) ([]byte, error) {
+	args := []string{
+		"-hide_banner",
+		"-loglevel", "error",
+		"-y",
+		"-ss", "3",
+		"-i", videoPath,
+		"-frames:v", "1",
+		"-f", "image2pipe",
+		"-vcodec", "mjpeg",
+		"pipe:1",
+	}
+
+	cmd := exec.CommandContext(ctx, s.ffmpegBin, args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return nil, fmt.Errorf("ffmpeg: %s", msg)
+	}
+	if stdout.Len() == 0 {
+		return nil, errors.New("ffmpeg: empty output")
+	}
+	return stdout.Bytes(), nil
+}

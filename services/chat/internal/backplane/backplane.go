@@ -33,6 +33,19 @@ type Backplane interface {
 	// PresenceCount returns the current global occupant count for a room.
 	PresenceCount(ctx context.Context, room string) (int, error)
 
+	// ResetRoom wipes the live transport log for a room. Postgres history is
+	// cleared separately by the store. Publishes a clear event to connected clients.
+	ResetRoom(ctx context.Context, room string) error
+
+	// Moderation state, scoped per channel owner (the username in "live/<owner>").
+	// Bans/timeouts and mod grants are keyed by username so they survive
+	// reconnects. IsBanned is true while a permanent ban or an unexpired timeout exists.
+	IsBanned(ctx context.Context, owner, username string) (bool, error)
+	SetBan(ctx context.Context, owner, username string, banned bool) error
+	SetTimeout(ctx context.Context, owner, username string, seconds int) error
+	IsMod(ctx context.Context, owner, username string) (bool, error)
+	SetMod(ctx context.Context, owner, username string, isMod bool) error
+
 	Close() error
 }
 

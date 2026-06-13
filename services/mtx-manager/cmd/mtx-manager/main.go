@@ -16,7 +16,9 @@ import (
 
 	"github.com/darkhanbayarerdenebat/mtx-manager/internal/api"
 	"github.com/darkhanbayarerdenebat/mtx-manager/internal/config"
+	"github.com/darkhanbayarerdenebat/mtx-manager/internal/livesync"
 	"github.com/darkhanbayarerdenebat/mtx-manager/internal/mediamtx"
+	"github.com/darkhanbayarerdenebat/mtx-manager/internal/presence"
 	"github.com/darkhanbayarerdenebat/mtx-manager/internal/thumbnails"
 	"github.com/darkhanbayarerdenebat/mtx-manager/internal/vods"
 )
@@ -71,10 +73,13 @@ func startServer(cfg config.Config, client *mediamtx.Client) {
 	}
 	gin.SetMode(mode)
 
+	presenceSvc := newPresence(cfg)
+
 	srv := api.New(
 		client,
 		thumbSvc,
 		vodSvc,
+		presenceSvc,
 		api.ParseCORSOrigins(cfg.CORSOrigins),
 		cfg.RTMPIngestURL,
 		cfg.HLSPlaybackURL,
@@ -88,6 +93,8 @@ func startServer(cfg config.Config, client *mediamtx.Client) {
 	}
 
 	log.Printf("MediaMTX manager listening on %s (%s)", cfg.ServerAddr, cfg)
+	log.Printf("recordings dir: %s", cfg.RecordingsDir)
+	log.Printf("thumbnails dir: %s", cfg.ThumbnailDir)
 	if thumbSvc.HasFFmpeg() {
 		log.Printf("thumbnails: ffmpeg capture enabled (interval %s)", thumbInterval)
 	} else {
@@ -98,6 +105,18 @@ func startServer(cfg config.Config, client *mediamtx.Client) {
 	defer stop()
 
 	go thumbSvc.RunWorker(ctx, srv.LivePathNames)
+
+	syncInterval, err := time.ParseDuration(cfg.LiveSyncInterval)
+	if err != nil {
+		syncInterval = 3 * time.Second
+	}
+	go livesync.New(client, cfg.APIURL, vodSvc, thumbSvc, syncInterval).Run(ctx)
+	log.Printf("livesync: watching MediaMTX → %s (interval %s)", cfg.APIURL, syncInterval)
+
+	go func() {
+		time.Sleep(2 * time.Second)
+		livesync.BackfillRecordings(ctx, vodSvc, thumbSvc, cfg.APIURL)
+	}()
 
 	go func() {
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -111,6 +130,19 @@ func startServer(cfg config.Config, client *mediamtx.Client) {
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
 	log.Println("shutdown complete")
+}
+
+// newPresence builds the viewer presence backend. It prefers Redis (correct
+// across multiple pods, self-heals missed leaves) and gracefully falls back to
+// the in-process tracker when Redis is unavailable so local dev still works.
+func newPresence(cfg config.Config) presence.Service {
+	rdb, err := presence.NewRedis(context.Background(), cfg.RedisURL)
+	if err != nil {
+		log.Printf("presence: redis unavailable (%v) — falling back to in-memory single-node tracker", err)
+		return presence.NewMemory()
+	}
+	log.Printf("presence: using redis backend (%s)", cfg.RedisURL)
+	return rdb
 }
 
 func printDashboard(client *mediamtx.Client) {

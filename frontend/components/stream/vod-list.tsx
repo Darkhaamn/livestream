@@ -1,15 +1,27 @@
 "use client"
 
 import { IconPlayerPlay } from "@tabler/icons-react"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
-import { getVods, type Vod } from "@/lib/mtx-api"
+import { ChannelAvatar } from "@/components/stream/channel-avatar"
+import { VodPlayOverlay, VodThumbnail } from "@/components/stream/vod-thumbnail"
+import { api, type StreamSession, type User } from "@/lib/api"
+import type { Vod } from "@/lib/mtx-api"
+import { formatSessionDuration } from "@/lib/time-format"
+import {
+  sessionToVod,
+  sessionsWithRecordings,
+  usernameFromStreamKey,
+} from "@/lib/vod-session"
+import { cn } from "@/lib/utils"
 
 type VodListProps = {
   streamKey: string
   onSelect: (vod: Vod) => void
   activeId?: string | null
   onLoaded?: (count: number) => void
+  channel?: User | null
+  sessions?: StreamSession[]
 }
 
 export function formatBytes(bytes: number): string {
@@ -36,58 +48,151 @@ function formatStartedAt(iso: string): string {
   return `${day} · ${time}`
 }
 
-export function VodList({ streamKey, onSelect, activeId, onLoaded }: VodListProps) {
-  const [vods, setVods] = useState<Vod[]>([])
+export function VodList({
+  streamKey,
+  onSelect,
+  activeId,
+  onLoaded,
+  channel: channelProp,
+  sessions: sessionsProp,
+}: VodListProps) {
+  const [channel, setChannel] = useState<User | null>(channelProp ?? null)
+  const [sessions, setSessions] = useState<StreamSession[]>(sessionsProp ?? [])
+
+  const username = usernameFromStreamKey(streamKey)
 
   useEffect(() => {
+    if (channelProp !== undefined) setChannel(channelProp)
+  }, [channelProp])
+
+  useEffect(() => {
+    if (sessionsProp !== undefined) setSessions(sessionsProp)
+  }, [sessionsProp])
+
+  useEffect(() => {
+    if (!username || channelProp !== undefined) return
     let active = true
-    getVods(streamKey)
+    api.users
+      .getByUsername(username)
       .then(data => {
-        if (!active) return
-        const list = Array.isArray(data) ? data : []
-        setVods(list)
-        onLoaded?.(list.length)
+        if (active) setChannel(data)
       })
       .catch(() => {
-        if (!active) return
-        setVods([])
-        onLoaded?.(0)
+        if (active) setChannel(null)
       })
     return () => {
       active = false
     }
-  }, [streamKey])
+  }, [username, channelProp])
 
-  if (vods.length === 0) return null
+  useEffect(() => {
+    if (!username || sessionsProp !== undefined) return
+    let active = true
+    api.users
+      .sessions(username)
+      .then(data => {
+        if (active) setSessions(Array.isArray(data) ? data : [])
+      })
+      .catch(() => {
+        if (active) setSessions([])
+      })
+    return () => {
+      active = false
+    }
+  }, [username, sessionsProp])
+
+  const recordings = useMemo(() => {
+    return sessionsWithRecordings(sessions)
+      .map(session => ({ session, vod: sessionToVod(session) }))
+      .filter((item): item is { session: StreamSession; vod: Vod } => item.vod != null)
+  }, [sessions])
+
+  const onLoadedRef = useRef(onLoaded)
+  onLoadedRef.current = onLoaded
+
+  useEffect(() => {
+    onLoadedRef.current?.(recordings.length)
+  }, [recordings.length])
+
+  if (recordings.length === 0) return null
+
+  const displayName = channel?.display_name ?? channel?.username ?? username ?? "Streamer"
 
   return (
     <div className="px-4 py-4">
-      <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-white/50">
+      <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-muted-foreground">
         Past broadcasts
       </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {vods.map(vod => (
-          <button
-            key={vod.id}
-            onClick={() => onSelect(vod)}
-            className={`flex items-center gap-3 rounded-lg border border-white/[0.06] bg-[#141417] p-3 text-left transition-colors hover:border-[#53fc18]/40 ${
-              activeId === vod.id ? "ring-2 ring-[#53fc18]" : ""
-            }`}
-          >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#53fc18]/10 text-[#53fc18]">
-              <IconPlayerPlay className="size-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold text-white">
-                {formatStartedAt(vod.startedAt)}
-              </span>
-              <span className="block text-xs text-white/50">{formatBytes(vod.sizeBytes)}</span>
-            </span>
-            <span className="shrink-0 rounded-md bg-[#eb0400]/10 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-[#eb0400]">
-              REC
-            </span>
-          </button>
-        ))}
+        {recordings.map(({ session, vod }) => {
+          const duration = formatSessionDuration(session)
+          const isActive = activeId === vod.id
+
+          return (
+            <button
+              key={session.id}
+              type="button"
+              onClick={() => onSelect(vod)}
+              className={cn(
+                "group overflow-hidden rounded-xl border border-border bg-card text-left transition-all",
+                isActive ? "ring-2 ring-primary" : "hover:border-primary/40 hover:shadow-md",
+              )}
+            >
+              <div className="relative aspect-video overflow-hidden bg-black">
+                {session.recording_path && channel ? (
+                  <VodThumbnail
+                    recordingPath={session.recording_path}
+                    username={channel.username}
+                    displayName={channel.display_name}
+                    avatarUrl={channel.avatar_url}
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-muted to-background" />
+                )}
+                <VodPlayOverlay />
+                {duration ? (
+                  <span className="absolute left-2 top-2 rounded bg-black/75 px-1.5 py-0.5 text-[11px] font-bold text-white">
+                    {duration}
+                  </span>
+                ) : null}
+                <span className="absolute bottom-2 left-2 rounded bg-[#eb0400]/90 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-white">
+                  REC
+                </span>
+              </div>
+
+              <div className="flex items-start gap-2 p-3">
+                {channel ? (
+                  <ChannelAvatar
+                    username={channel.username}
+                    displayName={channel.display_name}
+                    avatarUrl={channel.avatar_url}
+                    size="sm"
+                  />
+                ) : (
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary-text">
+                    <IconPlayerPlay className="size-5" />
+                  </span>
+                )}
+                <span className="min-w-0 flex-1">
+                  {channel ? (
+                    <span className="block truncate text-xs font-semibold text-muted-foreground">
+                      {displayName}
+                    </span>
+                  ) : null}
+                  <span className="mt-0.5 block truncate text-sm font-semibold text-foreground">
+                    {session.title}
+                  </span>
+                  <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                    {session.category ? (
+                      <span className="rounded-md bg-muted px-1.5 py-0.5">{session.category}</span>
+                    ) : null}
+                    <span>{formatStartedAt(session.started_at)}</span>
+                  </span>
+                </span>
+              </div>
+            </button>
+          )
+        })}
       </div>
     </div>
   )

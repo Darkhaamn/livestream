@@ -17,6 +17,7 @@ export interface User {
   stream_key?: string
   stream_title: string
   stream_category: string
+  stream_description: string
   is_live: boolean
   follower_count: number
   created_at: string
@@ -27,8 +28,34 @@ export interface StreamSession {
   path: string
   title: string
   category: string
+  description: string
   started_at: string
   ended_at: string | null
+  recording_path: string | null
+}
+
+export interface FollowingChannel {
+  username: string
+  display_name: string | null
+  avatar_url: string | null
+  stream_title: string
+  stream_category: string
+  stream_description: string
+  is_live: boolean
+  viewer_count: number
+  path: string
+}
+
+export interface LiveStream {
+  username: string
+  display_name: string | null
+  avatar_url: string | null
+  stream_title: string
+  stream_category: string
+  stream_description: string
+  path: string
+  viewer_count: number
+  started_at: string | null
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -76,11 +103,13 @@ export const api = {
   users: {
     me: (token: string) =>
       request<User>('/api/v1/users/me', { headers: authHeader(token) }),
+    myFollowing: (token: string) =>
+      request<FollowingChannel[]>('/api/v1/users/me/following', { headers: authHeader(token) }),
     getByUsername: (username: string) =>
       request<User>(`/api/v1/users/${username}`),
     sessions: (username: string) =>
       request<StreamSession[]>(`/api/v1/users/${username}/sessions`),
-    updateMe: (token: string, data: Partial<Pick<User, 'display_name' | 'bio' | 'stream_title' | 'stream_category'>>) =>
+    updateMe: (token: string, data: Partial<Pick<User, 'display_name' | 'bio' | 'stream_title' | 'stream_category' | 'stream_description'>>) =>
       request<User>('/api/v1/users/me', {
         method: 'PUT',
         headers: authHeader(token),
@@ -91,5 +120,24 @@ export const api = {
         method: 'POST',
         headers: authHeader(token),
       }),
+    followStatus: (token: string, username: string) =>
+      request<{ following: boolean }>(`/api/v1/users/${username}/follow-status`, {
+        headers: authHeader(token),
+      }),
+    follow: (token: string, username: string) =>
+      request<{ following: boolean; follower_count: number }>(`/api/v1/users/${username}/follow`, {
+        method: 'POST',
+        headers: authHeader(token),
+      }),
+    unfollow: (token: string, username: string) =>
+      request<{ following: boolean; follower_count: number }>(`/api/v1/users/${username}/follow`, {
+        method: 'DELETE',
+        headers: authHeader(token),
+      }),
+  },
+  streams: {
+    live: () => request<LiveStream[]>('/api/v1/streams/live'),
+    following: (token: string) =>
+      request<LiveStream[]>('/api/v1/streams/following', { headers: authHeader(token) }),
   },
 }

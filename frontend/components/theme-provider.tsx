@@ -11,7 +11,8 @@ function ThemeProvider({
     <NextThemesProvider
       attribute="class"
       defaultTheme="dark"
-      enableSystem
+      enableSystem={false}
+      storageKey="livestream-theme"
       disableTransitionOnChange
       {...props}
     >

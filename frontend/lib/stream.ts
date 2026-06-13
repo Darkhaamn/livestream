@@ -41,3 +41,8 @@ export function buildThumbnailUrl(streamKey: string, cacheBust?: number) {
   const t = cacheBust ?? Date.now()
   return `${API_BASE}/api/thumbnails/${encodeURIComponent(key)}?t=${t}`
 }
+
+export function buildVodThumbnailUrl(recordingPath: string) {
+  const id = recordingPath.trim().replace(/^\/+|\/+$/g, "")
+  return `${API_BASE}/api/vods/thumbnail/${encodeURIComponent(id)}`
+}

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/darkhanbayarerdenebat/mtx-manager/internal/mediamtx"
 	"github.com/darkhanbayarerdenebat/mtx-manager/internal/middleware"
+	"github.com/darkhanbayarerdenebat/mtx-manager/internal/presence"
 	"github.com/darkhanbayarerdenebat/mtx-manager/internal/thumbnails"
 	"github.com/darkhanbayarerdenebat/mtx-manager/internal/viewers"
 	"github.com/darkhanbayarerdenebat/mtx-manager/internal/vods"
@@ -19,7 +21,8 @@ type Server struct {
 	client             *mediamtx.Client
 	thumbnails         *thumbnails.Service
 	vods               *vods.Service
-	viewers            *viewers.Tracker
+	presence           presence.Service
+	tracker            *viewers.Tracker // non-nil only for the in-memory backend (rich member details)
 	rtmpURL            string
 	hlsPlaybackBase    string
 	whipURL            string
@@ -30,6 +33,7 @@ func New(
 	client *mediamtx.Client,
 	thumbs *thumbnails.Service,
 	vodSvc *vods.Service,
+	presenceSvc presence.Service,
 	corsOrigins []string,
 	rtmpURL, hlsPlaybackBase, whipURL, webrtcPlaybackBase string,
 ) *Server {
@@ -37,11 +41,17 @@ func New(
 		client:             client,
 		thumbnails:         thumbs,
 		vods:               vodSvc,
-		viewers:            viewers.NewTracker(),
+		presence:           presenceSvc,
 		rtmpURL:            rtmpURL,
 		hlsPlaybackBase:    hlsPlaybackBase,
 		whipURL:            whipURL,
 		webrtcPlaybackBase: webrtcPlaybackBase,
+	}
+
+	// When running the single-node in-memory backend, keep a direct reference to
+	// its tracker so the dashboard can still surface rich per-viewer details.
+	if mem, ok := presenceSvc.(*presence.Memory); ok {
+		s.tracker = mem.Tracker()
 	}
 
 	engine := gin.New()
@@ -62,7 +72,7 @@ func (s *Server) routes() {
 		api.GET("/health", s.handleHealth)
 		api.GET("/dashboard", s.handleDashboard)
 		api.GET("/paths", s.handlePaths)
-		api.GET("/paths/:name", s.handlePath)
+		api.GET("/paths/*name", s.handlePath)
 		api.GET("/streams/live", s.handleLiveStreams)
 		api.GET("/members", s.handleMembers)
 		api.GET("/broadcast", s.handleBroadcastConfig)
@@ -75,6 +85,7 @@ func (s *Server) routes() {
 		}
 		if s.vods != nil {
 			api.GET("/vods", s.handleVODs)
+			api.GET("/vods/thumbnail/*id", s.handleVODThumbnail)
 			api.GET("/vods/file/*id", s.handleVODFile)
 		}
 	}
@@ -102,6 +113,34 @@ func (s *Server) handleVODFile(c *gin.Context) {
 	}
 	c.Header("Content-Type", "video/mp4")
 	c.File(path)
+}
+
+func (s *Server) handleVODThumbnail(c *gin.Context) {
+	if s.thumbnails == nil {
+		writeError(c, http.StatusNotFound, errNotFound("thumbnails disabled"))
+		return
+	}
+
+	id := strings.TrimPrefix(c.Param("id"), "/")
+	if id == "" {
+		writeError(c, http.StatusBadRequest, errNotFound("vod id required"))
+		return
+	}
+
+	videoPath, err := s.vods.Open(id)
+	if err != nil {
+		writeError(c, http.StatusNotFound, errNotFound("vod not found"))
+		return
+	}
+
+	data, err := s.thumbnails.GetVOD(id, videoPath)
+	if err != nil {
+		writeError(c, http.StatusNotFound, errNotFound("thumbnail not available"))
+		return
+	}
+
+	c.Header("Cache-Control", "public, max-age=86400")
+	c.Data(http.StatusOK, "image/jpeg", data)
 }
 
 func (s *Server) LivePathNames() []string {
@@ -146,11 +185,29 @@ func (s *Server) dashboard() (mediamtx.Dashboard, error) {
 		return mediamtx.Dashboard{}, err
 	}
 
+	paths := make([]string, len(dashboard.Paths))
 	for i, path := range dashboard.Paths {
-		tracked := s.viewers.ForPath(path.Name)
+		paths[i] = path.Name
+	}
+	counts := s.presence.Counts(context.Background(), paths)
+
+	for i, path := range dashboard.Paths {
+		// Rich per-viewer member details are only available from the in-memory
+		// tracker; the Redis backend retains only counts.
+		var tracked []viewers.TrackedViewer
+		if s.tracker != nil {
+			tracked = s.tracker.ForPath(path.Name)
+		}
 		pathViewers := mediamtx.BuildViewers(path.Name, path.Members, tracked)
 		dashboard.Paths[i].Viewers = pathViewers
-		dashboard.Paths[i].ViewerCount = len(pathViewers)
+
+		// Viewer count comes from the presence service so it is correct across
+		// pods; fall back to the assembled member list when presence has none.
+		if c, ok := counts[path.Name]; ok && c > 0 {
+			dashboard.Paths[i].ViewerCount = c
+		} else {
+			dashboard.Paths[i].ViewerCount = len(pathViewers)
+		}
 	}
 	return dashboard, nil
 }
@@ -194,7 +251,7 @@ func (s *Server) handleLiveStreams(c *gin.Context) {
 }
 
 func (s *Server) handlePath(c *gin.Context) {
-	name := c.Param("name")
+	name := strings.TrimPrefix(c.Param("name"), "/")
 	dashboard, err := s.dashboard()
 	if err != nil {
 		writeError(c, http.StatusBadGateway, err)

@@ -7,30 +7,68 @@ import { useEffect, useState } from "react"
 import { ChatPanel } from "@/components/stream/chat-panel"
 import { LiveBadge } from "@/components/stream/live-badge"
 import { VodList } from "@/components/stream/vod-list"
+import { VodPlayer } from "@/components/stream/vod-player"
+import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import WebRtcPlayer from "@/components/webrtc-player"
-import { api, type User } from "@/lib/api"
+import { ChannelAvatar } from "@/components/stream/channel-avatar"
+import { useViewerPresence } from "@/hooks/use-viewer-presence"
+import { api, type StreamSession, type User } from "@/lib/api"
+import { findSessionForVod } from "@/lib/vod-session"
+import { useAuth } from "@/lib/auth-context"
 import { parseStreamDisplay } from "@/lib/display-stream"
-import { buildVodUrl, getPath, leaveViewer, pingViewer, type Vod } from "@/lib/mtx-api"
+import { buildVodUrl, getPath, type Vod } from "@/lib/mtx-api"
 import type { PathSummary } from "@/lib/mtx-types"
 import { formatViewerCount, getStreamResolution } from "@/lib/stream-health"
-import { buildHlsUrl, buildWebRtcUrl } from "@/lib/stream"
-import { getViewerId } from "@/lib/viewer-id"
+import { buildHlsUrl, buildWebRtcUrl, buildVodThumbnailUrl } from "@/lib/stream"
+import { cn } from "@/lib/utils"
 
 type StreamWatchProps = {
   streamKey: string
 }
 
 export default function StreamWatch({ streamKey }: StreamWatchProps) {
+  const { user, accessToken } = useAuth()
   const [stream, setStream] = useState<PathSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [following, setFollowing] = useState(false)
+  const [followBusy, setFollowBusy] = useState(false)
   const [activeVod, setActiveVod] = useState<Vod | null>(null)
   const [hasVods, setHasVods] = useState(false)
   const [channelUser, setChannelUser] = useState<User | null>(null)
+  const [sessions, setSessions] = useState<StreamSession[]>([])
 
   const channelUsername = streamKey.startsWith("live/") ? streamKey.slice("live/".length) : null
+  const isOwnChannel = !!user && !!channelUsername && user.username === channelUsername
+
+  useEffect(() => {
+    if (!channelUsername || !accessToken || isOwnChannel) {
+      setFollowing(false)
+      return
+    }
+    let active = true
+    api.users
+      .followStatus(accessToken, channelUsername)
+      .then(r => { if (active) setFollowing(r.following) })
+      .catch(() => { if (active) setFollowing(false) })
+    return () => { active = false }
+  }, [channelUsername, accessToken, isOwnChannel])
+
+  async function toggleFollow() {
+    if (!channelUsername || !accessToken || followBusy) return
+    setFollowBusy(true)
+    const next = !following
+    setFollowing(next)
+    try {
+      if (next) await api.users.follow(accessToken, channelUsername)
+      else await api.users.unfollow(accessToken, channelUsername)
+    } catch {
+      setFollowing(!next)
+    } finally {
+      setFollowBusy(false)
+    }
+  }
 
   useEffect(() => {
     if (!channelUsername) {
@@ -51,61 +89,81 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
     }
   }, [channelUsername])
 
+  useEffect(() => {
+    if (!channelUsername) {
+      setSessions([])
+      return
+    }
+    let active = true
+    const load = () => {
+      api.users
+        .sessions(channelUsername)
+        .then(data => {
+          if (active) setSessions(Array.isArray(data) ? data : [])
+        })
+        .catch(() => {
+          if (active) setSessions([])
+        })
+    }
+    load()
+    const timer = window.setInterval(load, 10000)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [channelUsername])
+
+  const activeSession = activeVod ? findSessionForVod(activeVod, sessions) : null
+
   const fallbackDisplay = parseStreamDisplay(streamKey)
+  const streamTitle = activeSession?.title ?? channelUser?.stream_title ?? fallbackDisplay.title
+  const category = activeSession?.category ?? channelUser?.stream_category ?? null
+  const streamDescription =
+    activeSession?.description ?? channelUser?.stream_description ?? null
   const display =
     channelUsername && channelUser
       ? {
-          title: channelUser.stream_title || fallbackDisplay.title,
+          title: streamTitle,
           channel: channelUser.display_name ?? channelUser.username,
           avatar: channelUsername.charAt(0).toUpperCase(),
         }
       : channelUsername
-        ? { ...fallbackDisplay, avatar: channelUsername.charAt(0).toUpperCase(), channel: channelUsername }
-        : fallbackDisplay
+        ? { ...fallbackDisplay, title: streamTitle, avatar: channelUsername.charAt(0).toUpperCase(), channel: channelUsername }
+        : { ...fallbackDisplay, title: streamTitle }
   const channelHref = channelUsername ? `/${channelUsername}` : "/"
-  const category = channelUser?.stream_category || null
-
-  useEffect(() => {
-    const viewerId = getViewerId()
-    if (!viewerId) return
-
-    const ping = () => {
-      void pingViewer(streamKey, viewerId).catch(() => undefined)
-    }
-
-    ping()
-    const heartbeat = window.setInterval(ping, 10000)
-
-    return () => {
-      window.clearInterval(heartbeat)
-      void leaveViewer(streamKey, viewerId).catch(() => undefined)
-    }
-  }, [streamKey])
 
   useEffect(() => {
     let active = true
 
     async function load() {
+      if (document.hidden) return
       try {
-        const viewerId = getViewerId()
-        if (viewerId) {
-          void pingViewer(streamKey, viewerId).catch(() => undefined)
-        }
         const data = await getPath(streamKey)
         if (!active) return
         setStream(data)
         setError(null)
       } catch (err) {
         if (!active) return
-        setError(err instanceof Error ? err.message : "Failed to load stream")
+        const message = err instanceof Error ? err.message : "Failed to load stream"
+        if (message === "not found") {
+          setStream(null)
+          setError(null)
+        } else {
+          setError(message)
+        }
       }
     }
 
     void load()
-    const timer = window.setInterval(() => void load(), 3000)
+    const timer = window.setInterval(() => void load(), 10000)
+    const onVisibility = () => {
+      if (!document.hidden) void load()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
     return () => {
       active = false
       window.clearInterval(timer)
+      document.removeEventListener("visibilitychange", onVisibility)
     }
   }, [streamKey])
 
@@ -114,6 +172,9 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
   const resolution = getStreamResolution(stream)
   const viewerCount = stream?.viewerCount ?? 0
   const isLive = stream?.online ?? false
+  const showLivePlayer = isLive || (channelUser?.is_live ?? false)
+
+  useViewerPresence(streamKey, isLive && !activeVod)
 
   async function handleShare() {
     const url = window.location.href
@@ -127,98 +188,129 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
   }
 
   return (
-    <div className="flex flex-col bg-[#0b0b0f] lg:flex-row">
-      {/* Main column: player + stream info */}
+    <div className="flex flex-col bg-background lg:flex-row">
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="w-full bg-black">
+        <div className="relative w-full player-stage">
           {error ? (
-            <div className="border-b border-[#eb0400]/20 bg-[#eb0400]/10 px-4 py-2 text-sm text-red-400">
+            <div className="border-b border-destructive/20 bg-destructive/10 px-4 py-2 text-sm text-destructive">
               {error}
             </div>
           ) : null}
 
-          {!stream && !error ? (
-            <Skeleton className="aspect-video w-full rounded-none" />
-          ) : activeVod ? (
-            <div>
-              <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] bg-[#141417] px-4 py-2">
-                <span className="text-sm text-white/50">Watching recording</span>
-                {isLive ? (
-                  <button
-                    onClick={() => setActiveVod(null)}
-                    className="rounded-md bg-[#53fc18] px-3 py-1.5 text-sm font-semibold text-black transition-colors hover:bg-[#46d614]"
-                  >
-                    Back to live
-                  </button>
-                ) : (
-                  <span className="rounded-md bg-[#eb0400]/10 px-2 py-1 text-xs font-bold tracking-wider text-[#eb0400]">
-                    Recording
-                  </span>
+          <div className="relative aspect-video w-full">
+            {showLivePlayer ? (
+              <div
+                className={cn(
+                  "absolute inset-0",
+                  activeVod && "invisible pointer-events-none",
                 )}
+                aria-hidden={!!activeVod}
+              >
+                <WebRtcPlayer
+                  src={webRtcPlaybackUrl}
+                  fallbackSrc={hlsPlaybackUrl}
+                  viewerCount={viewerCount}
+                  className="h-full w-full rounded-none"
+                  suspended={!!activeVod}
+                />
               </div>
-              <video
-                key={activeVod.id}
-                src={buildVodUrl(activeVod)}
-                controls
-                autoPlay
-                className="aspect-video w-full bg-black"
-              />
-            </div>
-          ) : stream && !isLive ? (
-            <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 bg-black">
-              <p className="text-lg font-bold tracking-tight text-white">Channel is offline</p>
-              {hasVods ? (
-                <p className="text-sm text-white/50">Watch a past broadcast below</p>
-              ) : null}
-            </div>
-          ) : (
-            <WebRtcPlayer
-              src={webRtcPlaybackUrl}
-              fallbackSrc={hlsPlaybackUrl}
-              viewerCount={viewerCount}
-              className="rounded-none"
-            />
-          )}
+            ) : null}
+
+            {activeVod ? (
+              <div className="absolute inset-0 z-10">
+                <VodPlayer
+                  key={activeVod.id}
+                  src={buildVodUrl(activeVod)}
+                  title={display.title}
+                  poster={buildVodThumbnailUrl(activeVod.id)}
+                />
+              </div>
+            ) : !showLivePlayer && !stream && !error ? (
+              <Skeleton className="aspect-video w-full rounded-none bg-muted" />
+            ) : !showLivePlayer && stream && !isLive ? (
+              <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 bg-black">
+                <p className="text-lg font-bold tracking-tight text-neutral-100">Channel is offline</p>
+                {hasVods ? (
+                  <p className="text-sm text-neutral-400">Watch a past broadcast below</p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
 
-        {/* Info bar */}
-        <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] px-4 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-border bg-card px-4 py-4">
           <div className="flex min-w-0 items-start gap-3">
-            <Link
-              href={channelHref}
-              className={`flex size-12 shrink-0 items-center justify-center rounded-full bg-[#1c1c21] text-sm font-bold text-white ${
-                isLive ? "ring-2 ring-[#53fc18]" : "ring-1 ring-white/[0.06]"
-              }`}
-            >
-              {display.avatar}
-            </Link>
+            {channelUsername && channelUser ? (
+              <Link href={channelHref} className="shrink-0">
+                <ChannelAvatar
+                  username={channelUser.username}
+                  displayName={channelUser.display_name}
+                  avatarUrl={channelUser.avatar_url}
+                  size="md"
+                  live={isLive && !activeVod}
+                />
+              </Link>
+            ) : (
+              <Link
+                href={channelHref}
+                className={cn(
+                  "flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-foreground",
+                  isLive ? "ring-2 ring-primary" : "ring-1 ring-border",
+                )}
+              >
+                {display.avatar}
+              </Link>
+            )}
 
             <div className="min-w-0 flex-1">
-              <Link href={channelHref} className="block truncate text-lg font-bold tracking-tight text-white hover:text-[#53fc18]">
+              <Link
+                href={channelHref}
+                className="block truncate text-lg font-bold tracking-tight text-foreground hover:text-primary-text"
+              >
                 {display.channel}
               </Link>
-              <p className="truncate text-sm text-white/70">{display.title}</p>
+              <p className="truncate text-sm text-muted-foreground">{display.title}</p>
+              {streamDescription ? (
+                <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                  {streamDescription}
+                </p>
+              ) : null}
 
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                {isLive ? (
+                {activeVod ? (
+                  <>
+                    <span className="rounded-md bg-destructive/10 px-1.5 py-0.5 text-xs font-bold tracking-wider text-destructive">
+                      Recording
+                    </span>
+                    {isLive ? (
+                      <button
+                        type="button"
+                        onClick={() => setActiveVod(null)}
+                        className="text-xs font-semibold text-primary-text hover:underline"
+                      >
+                        Back to live
+                      </button>
+                    ) : null}
+                  </>
+                ) : isLive ? (
                   <>
                     <LiveBadge size="sm" />
-                    <span className="flex items-center gap-1.5 text-white/50">
-                      <span className="inline-block size-1.5 rounded-full bg-[#eb0400]" />
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <span className="inline-block size-1.5 rounded-full bg-destructive" />
                       <IconUsers className="size-3.5" />
                       {formatViewerCount(viewerCount)} viewers
                     </span>
                   </>
                 ) : (
-                  <span className="text-white/50">Offline</span>
+                  <span className="text-muted-foreground">Offline</span>
                 )}
                 {category ? (
-                  <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 text-xs font-medium text-white/50">
+                  <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                     {category}
                   </span>
                 ) : null}
                 {resolution ? (
-                  <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 text-xs font-medium text-white/50">
+                  <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                     {resolution}
                   </span>
                 ) : null}
@@ -226,46 +318,46 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
             </div>
           </div>
 
-          {/* Action row */}
           <div className="flex shrink-0 items-center gap-2">
-            <button
-              onClick={() => setFollowing(prev => !prev)}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
-                following
-                  ? "bg-white/10 text-white hover:bg-white/15"
-                  : "bg-[#53fc18] text-black hover:bg-[#46d614]"
-              }`}
-            >
-              <IconHeart className="size-4" />
-              {following ? "Following" : "Follow"}
-            </button>
-            <button
-              onClick={() => void handleShare()}
-              className="flex items-center gap-1.5 rounded-md bg-white/10 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/15"
-            >
+            {user && !isOwnChannel ? (
+              <Button
+                type="button"
+                variant={following ? "secondary" : "default"}
+                size="sm"
+                onClick={() => void toggleFollow()}
+                disabled={followBusy}
+                className="gap-1.5"
+              >
+                <IconHeart className={cn("size-4", !following && "fill-current")} />
+                {following ? "Following" : "Follow"}
+              </Button>
+            ) : null}
+            <Button type="button" variant="secondary" size="sm" onClick={() => void handleShare()} className="gap-1.5">
               <IconShare className="size-4" />
               {copied ? "Copied!" : "Share"}
-            </button>
+            </Button>
           </div>
         </div>
 
-        {/* Past broadcasts */}
-        <VodList
-          streamKey={streamKey}
-          onSelect={setActiveVod}
-          activeId={activeVod?.id ?? null}
-          onLoaded={count => setHasVods(count > 0)}
-        />
+        {!isLive ? (
+          <VodList
+            streamKey={streamKey}
+            channel={channelUser}
+            sessions={sessions}
+            onSelect={setActiveVod}
+            activeId={activeVod?.id ?? null}
+            onLoaded={count => setHasVods(count > 0)}
+          />
+        ) : null}
 
-        {/* About panel */}
         <div className="hidden px-4 py-4 lg:block">
-          <div className="rounded-lg border border-white/[0.06] bg-[#141417] p-4">
-            <h2 className="mb-2 text-sm font-bold tracking-tight text-white">
+          <div className="surface-card p-4">
+            <h2 className="mb-2 text-sm font-bold tracking-tight text-foreground">
               About {display.channel}
             </h2>
-            <p className="text-sm leading-relaxed text-white/50">
+            <p className="text-sm leading-relaxed text-muted-foreground">
               Live broadcast on LiveStream. Stream key{" "}
-              <code className="rounded-md bg-white/[0.06] px-1 py-0.5 font-mono text-xs text-white/50">
+              <code className="rounded-md bg-muted px-1 py-0.5 font-mono text-xs text-foreground">
                 {streamKey}
               </code>
             </p>
@@ -273,8 +365,7 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
         </div>
       </div>
 
-      {/* Chat aside */}
-      <aside className="flex h-[320px] w-full shrink-0 flex-col border-t border-white/[0.06] lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:w-[340px] lg:border-l lg:border-t-0 xl:w-[380px]">
+      <aside className="flex h-[320px] w-full shrink-0 flex-col border-t border-border lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:w-[340px] lg:border-l lg:border-t-0 xl:w-[380px]">
         <ChatPanel streamKey={streamKey} />
       </aside>
     </div>

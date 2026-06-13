@@ -38,14 +38,14 @@ func main() {
 	redisCache, err := cache.New(cfg.RedisURL)
 	if err != nil {
 		log.Printf("redis unavailable: %v (continuing without cache)", err)
+		redisCache = nil
 	}
-	_ = redisCache
 
 	authSvc := auth.NewService(gormDB, cfg.JWTSecret)
 	authHandler := auth.NewHandler(authSvc)
 	userRepo := user.NewRepository(gormDB)
-	userHandler := user.NewHandler(userRepo, cfg.JWTSecret)
-	mtxHandler := mtxhook.NewHandler(gormDB)
+	userHandler := user.NewHandler(userRepo, cfg.JWTSecret, redisCache)
+	mtxHandler := mtxhook.NewHandler(gormDB, redisCache, cfg.ChatURL)
 
 	mode := os.Getenv("GIN_MODE")
 	if mode == "" {
@@ -67,6 +67,15 @@ func main() {
 			authGroup.POST("/logout", authHandler.Logout)
 		}
 
+		streamsGroup := v1.Group("/streams")
+		{
+			// Public discovery: list live streams from Postgres enriched with
+			// viewer counts from the shared Redis presence keys.
+			streamsGroup.GET("/live", userHandler.ListLiveStreams)
+			// Live streams from channels the authenticated user follows.
+			streamsGroup.GET("/following", middleware.Auth(cfg.JWTSecret), userHandler.ListFollowingStreams)
+		}
+
 		usersGroup := v1.Group("/users")
 		{
 			// GET /users/:username also serves /users/me (handled inside GetUser)
@@ -77,8 +86,12 @@ func main() {
 			authed := usersGroup.Group("")
 			authed.Use(middleware.Auth(cfg.JWTSecret))
 			{
-				authed.PUT("/me", userHandler.UpdateMe)
-				authed.POST("/me/stream-key", userHandler.RegenerateKey)
+			authed.PUT("/me", userHandler.UpdateMe)
+			authed.POST("/me/stream-key", userHandler.RegenerateKey)
+			authed.GET("/me/following", userHandler.ListMyFollowing)
+				authed.GET("/:username/follow-status", userHandler.FollowStatus)
+				authed.POST("/:username/follow", userHandler.Follow)
+				authed.DELETE("/:username/follow", userHandler.Unfollow)
 			}
 		}
 
@@ -94,6 +107,7 @@ func main() {
 		mtx.POST("/auth", mtxHandler.Auth)
 		mtx.POST("/stream-started", mtxHandler.StreamStarted)
 		mtx.POST("/stream-stopped", mtxHandler.StreamStopped)
+		mtx.POST("/recording-attached", mtxHandler.RecordingAttached)
 	}
 
 	srv := &http.Server{

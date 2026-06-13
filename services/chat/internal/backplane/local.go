@@ -16,6 +16,7 @@ type LocalBackplane struct {
 	mu       sync.Mutex
 	subs     map[string]map[chan message.Message]struct{}
 	presence map[string]map[string]time.Time
+	mod      *modState
 }
 
 func NewLocal() *LocalBackplane {
@@ -107,6 +108,102 @@ func (b *LocalBackplane) PresenceCount(_ context.Context, room string) (int, err
 		n++
 	}
 	return n, nil
+}
+
+func (b *LocalBackplane) ResetRoom(ctx context.Context, room string) error {
+	return b.Publish(ctx, room, message.NewClear(room, ""))
+}
+
+// --- Moderation (per channel owner), in-process ---
+
+type modState struct {
+	bans     map[string]map[string]struct{}  // owner -> set of banned usernames
+	timeouts map[string]map[string]time.Time // owner -> username -> expiry
+	mods     map[string]map[string]struct{}  // owner -> set of mod usernames
+}
+
+func (b *LocalBackplane) ensureMod() *modState {
+	if b.mod == nil {
+		b.mod = &modState{
+			bans:     map[string]map[string]struct{}{},
+			timeouts: map[string]map[string]time.Time{},
+			mods:     map[string]map[string]struct{}{},
+		}
+	}
+	return b.mod
+}
+
+func (b *LocalBackplane) IsBanned(_ context.Context, owner, username string) (bool, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	m := b.ensureMod()
+	if s := m.bans[owner]; s != nil {
+		if _, ok := s[username]; ok {
+			return true, nil
+		}
+	}
+	if t := m.timeouts[owner]; t != nil {
+		if exp, ok := t[username]; ok {
+			if time.Now().Before(exp) {
+				return true, nil
+			}
+			delete(t, username)
+		}
+	}
+	return false, nil
+}
+
+func (b *LocalBackplane) SetBan(_ context.Context, owner, username string, banned bool) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	m := b.ensureMod()
+	if banned {
+		if m.bans[owner] == nil {
+			m.bans[owner] = map[string]struct{}{}
+		}
+		m.bans[owner][username] = struct{}{}
+	} else {
+		delete(m.bans[owner], username)
+		delete(m.timeouts[owner], username)
+	}
+	return nil
+}
+
+func (b *LocalBackplane) SetTimeout(_ context.Context, owner, username string, seconds int) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	m := b.ensureMod()
+	if m.timeouts[owner] == nil {
+		m.timeouts[owner] = map[string]time.Time{}
+	}
+	m.timeouts[owner][username] = time.Now().Add(time.Duration(seconds) * time.Second)
+	return nil
+}
+
+func (b *LocalBackplane) IsMod(_ context.Context, owner, username string) (bool, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	m := b.ensureMod()
+	if s := m.mods[owner]; s != nil {
+		_, ok := s[username]
+		return ok, nil
+	}
+	return false, nil
+}
+
+func (b *LocalBackplane) SetMod(_ context.Context, owner, username string, isMod bool) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	m := b.ensureMod()
+	if isMod {
+		if m.mods[owner] == nil {
+			m.mods[owner] = map[string]struct{}{}
+		}
+		m.mods[owner][username] = struct{}{}
+	} else {
+		delete(m.mods[owner], username)
+	}
+	return nil
 }
 
 func (b *LocalBackplane) Close() error { return nil }

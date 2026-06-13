@@ -32,6 +32,7 @@
     --color-secondary: var(--secondary);
     --color-primary-foreground: var(--primary-foreground);
     --color-primary: var(--primary);
+    --color-primary-text: var(--primary-text);
     --color-popover-foreground: var(--popover-foreground);
     --color-popover: var(--popover);
     --color-card-foreground: var(--card-foreground);
@@ -48,38 +49,39 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
+    --background: oklch(0.99 0 0);
     --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
+    --card: oklch(0.98 0 0);
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.5 0.134 242.749);
-    --primary-foreground: oklch(0.977 0.013 236.62);
-    --secondary: oklch(0.967 0.001 286.375);
-    --secondary-foreground: oklch(0.21 0.006 285.885);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
+    --primary: #53fc18;
+    --primary-foreground: #0a0a0a;
+    --primary-text: #1a6b12;
+    --secondary: oklch(0.94 0 0);
+    --secondary-foreground: oklch(0.2 0 0);
+    --muted: oklch(0.95 0 0);
+    --muted-foreground: oklch(0.38 0 0);
+    --accent: oklch(0.93 0 0);
+    --accent-foreground: oklch(0.22 0 0);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    --border: oklch(0.9 0 0);
+    --input: oklch(0.94 0 0);
+    --ring: #53fc18;
     --chart-1: oklch(0.828 0.111 230.318);
     --chart-2: oklch(0.685 0.169 237.323);
     --chart-3: oklch(0.588 0.158 241.966);
     --chart-4: oklch(0.5 0.134 242.749);
     --chart-5: oklch(0.443 0.11 240.79);
     --radius: 0.875rem;
-    --sidebar: oklch(0.985 0 0);
+    --sidebar: oklch(0.97 0 0);
     --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.588 0.158 241.966);
-    --sidebar-primary-foreground: oklch(0.977 0.013 236.62);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --sidebar-primary: #53fc18;
+    --sidebar-primary-foreground: #000000;
+    --sidebar-accent: oklch(0.95 0 0);
+    --sidebar-accent-foreground: oklch(0.145 0 0);
+    --sidebar-border: oklch(0.9 0 0);
+    --sidebar-ring: #53fc18;
 }
 
 .dark {
@@ -91,10 +93,11 @@
     --popover-foreground: oklch(0.985 0 0);
     --primary: #53fc18;
     --primary-foreground: #000000;
+    --primary-text: #53fc18;
     --secondary: oklch(1 0 0 / 10%);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: #1c1c21;
-    --muted-foreground: oklch(1 0 0 / 50%);
+    --muted-foreground: oklch(1 0 0 / 65%);
     --accent: oklch(1 0 0 / 6%);
     --accent-foreground: oklch(0.985 0 0);
     --destructive: #eb0400;
@@ -128,7 +131,68 @@
     }
 }
 
+/* Always-dark surfaces tied to video (player + chat rail) */
+@layer utilities {
+  .player-stage {
+    @apply bg-black text-neutral-100;
+  }
+
+  .player-chrome {
+    @apply border-white/10 bg-neutral-950 text-neutral-100;
+  }
+
+  .surface-card {
+    @apply rounded-xl border border-border bg-card text-card-foreground;
+  }
+
+  .surface-muted {
+    @apply rounded-lg border border-border bg-muted/50;
+  }
+}
+
 @keyframes shimmer {
   0%, 100% { transform: translateX(-100%); }
   50% { transform: translateX(200%); }
+}
+
+/* Plyr VOD player — full-width featured stage */
+.vod-player .plyr {
+  --plyr-color-main: #53fc18;
+  --plyr-video-background: #000;
+  --plyr-menu-background: rgba(11, 11, 15, 0.95);
+  --plyr-menu-color: #fff;
+  --plyr-control-radius: 6px;
+  --plyr-font-family: inherit;
+  --plyr-range-fill-background: #53fc18;
+  --plyr-badge-background: rgba(255, 255, 255, 0.12);
+  --plyr-badge-text-color: #fff;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+.vod-player .plyr--video,
+.vod-player .plyr__video-wrapper,
+.vod-player video {
+  height: 100%;
+  width: 100%;
+}
+
+.vod-player .plyr--video {
+  overflow: hidden;
+}
+
+.vod-player .plyr__control--overlaid {
+  background: #53fc18;
+  color: #000;
+  padding: 1.25rem;
+}
+
+.vod-player .plyr__control--overlaid:hover {
+  background: #46d614;
+}
+
+.vod-player .plyr__controls {
+  padding: 12px 16px 16px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
 }

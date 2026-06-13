@@ -5,8 +5,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,6 +48,7 @@ func New(h *hub.Hub, bp backplane.Backplane, st *store.Store, jwtSecret string, 
 func (s *Server) Register(r *gin.Engine) {
 	r.GET("/ws/*room", s.handleWS)
 	r.GET("/rooms/count/*room", s.handleCount)
+	r.POST("/internal/rooms/reset", s.handleResetRoom)
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
@@ -69,6 +72,24 @@ func (s *Server) handleWS(c *gin.Context) {
 	// for chat fan-out, but presence is keyed by connID so counts stay correct.
 	connID := userID + ":" + randomHex(6)
 
+	// Roles: owner is the channel username (room "live/<owner>"). A logged-in
+	// viewer whose username == owner is the broadcaster; mods come from the
+	// per-channel Redis set. Badges are computed once at connect.
+	owner := strings.TrimPrefix(roomName, "live/")
+	isGuest := strings.HasPrefix(userID, "guest_")
+	isBroadcaster := !isGuest && username == owner
+	isMod := false
+	if !isGuest && !isBroadcaster {
+		isMod, _ = s.bp.IsMod(c.Request.Context(), owner, username)
+	}
+	var badges []string
+	if isBroadcaster {
+		badges = []string{message.BadgeBroadcaster}
+	} else if isMod {
+		badges = []string{message.BadgeMod}
+	}
+	canModerate := isBroadcaster || isMod
+
 	conn, err := websocket.Accept(c.Writer, c.Request, &websocket.AcceptOptions{
 		OriginPatterns: s.originPatterns(),
 	})
@@ -86,6 +107,7 @@ func (s *Server) handleWS(c *gin.Context) {
 	// Replay durable history to THIS client only (from Postgres), before joining.
 	if s.store != nil {
 		for _, hm := range s.store.History(ctx, roomName, 50) {
+			hm.Badges = s.badgesForMessage(ctx, owner, hm)
 			data, err := json.Marshal(hm)
 			if err != nil {
 				continue
@@ -123,7 +145,32 @@ func (s *Server) handleWS(c *gin.Context) {
 		if text == "" || len(text) > 500 {
 			continue
 		}
-		msg := message.NewChat(roomName, userID, username, color, text)
+
+		// Moderation commands (broadcaster/mod only). Not published as chat.
+		if strings.HasPrefix(text, "/") {
+			if canModerate {
+				s.handleCommand(ctx, conn, roomName, owner, isBroadcaster, text)
+			} else {
+				_ = client.Write(ctx, mustJSON(message.Message{
+					Type: message.TypeError, Room: roomName,
+					Text: "you are not a moderator", Timestamp: nowUTC(),
+				}))
+			}
+			continue
+		}
+
+		// Enforce bans/timeouts for regular chatters (mods/broadcaster exempt).
+		if !canModerate {
+			if banned, _ := s.bp.IsBanned(ctx, owner, username); banned {
+				_ = client.Write(ctx, mustJSON(message.Message{
+					Type: message.TypeError, Room: roomName,
+					Text: "you are banned or timed out in this channel", Timestamp: nowUTC(),
+				}))
+				continue
+			}
+		}
+
+		msg := message.NewChat(roomName, randomHex(8), userID, username, color, text, badges)
 		if s.store != nil {
 			go s.store.Save(msg)
 		}
@@ -134,6 +181,106 @@ func (s *Server) handleWS(c *gin.Context) {
 			log.Printf("publish room=%s: %v", roomName, err)
 		}
 	}
+}
+
+// handleCommand executes a moderation command from a broadcaster/mod connection.
+// Commands are control messages: they mutate Redis state and publish system /
+// clear / delete events to the room, but are never echoed as chat.
+func (s *Server) handleCommand(ctx context.Context, conn *websocket.Conn, room, owner string, isBroadcaster bool, text string) {
+	fields := strings.Fields(text)
+	cmd := strings.ToLower(fields[0])
+	usage := func(m string) {
+		_ = conn.Write(ctx, websocket.MessageText, mustJSON(message.Message{
+			Type: message.TypeError, Room: room, Text: m, Timestamp: nowUTC(),
+		}))
+	}
+	target := ""
+	if len(fields) > 1 {
+		target = fields[1]
+	}
+
+	switch cmd {
+	case "/ban":
+		if target == "" {
+			usage("usage: /ban <username>")
+			return
+		}
+		_ = s.bp.SetBan(ctx, owner, target, true)
+		_ = s.bp.Publish(ctx, room, message.NewSystem(room, target+" was banned"))
+		_ = s.bp.Publish(ctx, room, message.NewClear(room, target))
+	case "/unban":
+		if target == "" {
+			usage("usage: /unban <username>")
+			return
+		}
+		_ = s.bp.SetBan(ctx, owner, target, false)
+		_ = s.bp.Publish(ctx, room, message.NewSystem(room, target+" was unbanned"))
+	case "/timeout":
+		if target == "" || len(fields) < 3 {
+			usage("usage: /timeout <username> <seconds>")
+			return
+		}
+		secs, err := strconv.Atoi(fields[2])
+		if err != nil || secs <= 0 {
+			usage("timeout seconds must be a positive number")
+			return
+		}
+		_ = s.bp.SetTimeout(ctx, owner, target, secs)
+		_ = s.bp.Publish(ctx, room, message.NewSystem(room, fmt.Sprintf("%s was timed out for %ds", target, secs)))
+		_ = s.bp.Publish(ctx, room, message.NewClear(room, target))
+	case "/delete":
+		if target == "" {
+			usage("usage: /delete <messageId>")
+			return
+		}
+		_ = s.bp.Publish(ctx, room, message.NewDelete(room, target))
+	case "/clear":
+		_ = s.bp.Publish(ctx, room, message.NewClear(room, ""))
+		_ = s.bp.Publish(ctx, room, message.NewSystem(room, "chat was cleared"))
+	case "/mod", "/unmod":
+		if !isBroadcaster {
+			usage("only the broadcaster can assign moderators")
+			return
+		}
+		if target == "" {
+			usage("usage: " + cmd + " <username>")
+			return
+		}
+		grant := cmd == "/mod"
+		_ = s.bp.SetMod(ctx, owner, target, grant)
+		verb := "is now a moderator"
+		if !grant {
+			verb = "is no longer a moderator"
+		}
+		_ = s.bp.Publish(ctx, room, message.NewSystem(room, target+" "+verb))
+	default:
+		usage("unknown command: " + cmd)
+	}
+}
+
+func mustJSON(m message.Message) []byte {
+	b, _ := json.Marshal(m)
+	return b
+}
+
+func nowUTC() time.Time { return time.Now().UTC() }
+
+// badgesForMessage restores broadcaster/mod badges on replayed history. Live
+// messages already carry badges; Postgres history does not persist them yet.
+func (s *Server) badgesForMessage(ctx context.Context, owner string, msg message.Message) []string {
+	if msg.Type != message.TypeChat || msg.Username == "" {
+		return msg.Badges
+	}
+	if len(msg.Badges) > 0 {
+		return msg.Badges
+	}
+	if msg.Username == owner {
+		return []string{message.BadgeBroadcaster}
+	}
+	if isMod, _ := s.bp.IsMod(ctx, owner, msg.Username); isMod {
+		return []string{message.BadgeMod}
+	}
+	return nil
 }
 
 func (s *Server) heartbeat(ctx context.Context, room, connID string, stop <-chan struct{}) {
@@ -159,6 +306,38 @@ func (s *Server) handleCount(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"count": n})
+}
+
+type resetRoomRequest struct {
+	Room string `json:"room"`
+}
+
+// handleResetRoom wipes chat for a new broadcast session. Called by the API
+// when a stream session starts.
+func (s *Server) handleResetRoom(c *gin.Context) {
+	var req resetRoomRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.Room == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "room required"})
+		return
+	}
+	if !strings.HasPrefix(req.Room, "live/") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid room"})
+		return
+	}
+
+	ctx := c.Request.Context()
+	if s.store != nil {
+		if err := s.store.ClearRoom(ctx, req.Room); err != nil {
+			log.Printf("reset room %s: clear store: %v", req.Room, err)
+		}
+	}
+	if err := s.bp.ResetRoom(ctx, req.Room); err != nil {
+		log.Printf("reset room %s: backplane: %v", req.Room, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "reset failed"})
+		return
+	}
+	_ = s.bp.Publish(ctx, req.Room, message.NewSystem(req.Room, "Chat cleared for a new stream"))
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 func (s *Server) extractUser(r *http.Request) (id, username string) {

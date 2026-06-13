@@ -6,7 +6,17 @@ async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { cache: "no-store", ...init })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(body || res.statusText)
+    if (res.status === 404) {
+      throw new Error("not found")
+    }
+    let message = body || res.statusText
+    try {
+      const json = JSON.parse(body) as { error?: string }
+      if (json.error) message = json.error
+    } catch {
+      // use raw body
+    }
+    throw new Error(message)
   }
   return res.json() as Promise<T>
 }
@@ -57,6 +67,9 @@ export interface Vod {
   startedAt: string
   sizeBytes: number
   url: string
+  sessionId?: number
+  title?: string
+  category?: string
 }
 
 export function getVods(path?: string) {

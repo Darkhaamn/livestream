@@ -25,6 +25,18 @@ const nextConfig: NextConfig = {
         source: "/api/thumbnails/:path*",
         destination: `${mtxApiUrl}/api/thumbnails/:path*`,
       },
+      {
+        source: "/api/vods",
+        destination: `${mtxApiUrl}/api/vods`,
+      },
+      {
+        source: "/api/vods/file/:path*",
+        destination: `${mtxApiUrl}/api/vods/file/:path*`,
+      },
+      {
+        source: "/api/vods/thumbnail/:path*",
+        destination: `${mtxApiUrl}/api/vods/thumbnail/:path*`,
+      },
       // /api/viewers/* handled by app/api/viewers route handlers (real client IP)
     ]
   },

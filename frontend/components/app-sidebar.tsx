@@ -8,11 +8,15 @@ import {
 } from "@tabler/icons-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react"
 
 import { ChannelAvatar } from "@/components/stream/channel-avatar"
-import { api, type FollowingChannel, type LiveStream } from "@/lib/api"
+import { api, type FollowingChannel } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
+import {
+  getLiveStreamsSnapshot,
+  subscribeLiveStreams,
+} from "@/lib/live-streams-store"
 import { formatViewerCount } from "@/lib/stream-health"
 import { cn } from "@/lib/utils"
 
@@ -34,7 +38,7 @@ type SidebarStreamer = {
   viewer_count: number
 }
 
-function toSidebarStreamer(channel: FollowingChannel | LiveStream, isLive: boolean): SidebarStreamer {
+function toSidebarStreamer(channel: FollowingChannel, isLive: boolean): SidebarStreamer {
   return {
     username: channel.username,
     display_name: channel.display_name,
@@ -42,6 +46,19 @@ function toSidebarStreamer(channel: FollowingChannel | LiveStream, isLive: boole
     stream_category: channel.stream_category,
     is_live: isLive,
     viewer_count: channel.viewer_count,
+  }
+}
+
+function liveStreamToSidebarStreamer(
+  stream: ReturnType<typeof getLiveStreamsSnapshot>["streams"][number],
+): SidebarStreamer {
+  return {
+    username: stream.username,
+    display_name: stream.display_name,
+    avatar_url: stream.avatar_url,
+    stream_category: stream.stream_category,
+    is_live: true,
+    viewer_count: stream.viewer_count,
   }
 }
 
@@ -138,31 +155,30 @@ export function AppSidebar() {
   const pathname = usePathname()
   const { user, accessToken } = useAuth()
   const [following, setFollowing] = useState<FollowingChannel[]>([])
-  const [recommended, setRecommended] = useState<LiveStream[]>([])
+  const liveSnapshot = useSyncExternalStore(
+    subscribeLiveStreams,
+    getLiveStreamsSnapshot,
+    getLiveStreamsSnapshot,
+  )
 
   useEffect(() => {
     let active = true
 
-    const load = async () => {
-      if (document.hidden) return
+    const loadFollowing = async () => {
+      if (document.hidden || !accessToken) {
+        if (active) setFollowing([])
+        return
+      }
       try {
-        const live = await api.streams.live()
-        if (!active) return
-        setRecommended(live)
-
-        if (accessToken) {
-          const channels = await api.users.myFollowing(accessToken)
-          if (active) setFollowing(channels)
-        } else {
-          setFollowing([])
-        }
+        const channels = await api.users.myFollowing(accessToken)
+        if (active) setFollowing(channels)
       } catch {
         if (!active) return
       }
     }
 
-    void load()
-    const timer = window.setInterval(() => void load(), POLL_MS)
+    void loadFollowing()
+    const timer = window.setInterval(() => void loadFollowing(), POLL_MS)
     return () => {
       active = false
       window.clearInterval(timer)
@@ -181,12 +197,15 @@ export function AppSidebar() {
   }, [following])
 
   const recommendedStreamers = useMemo(() => {
-    const followingUsernames = new Set(following.map(ch => ch.username))
-    return recommended
-      .filter(stream => stream.username !== user?.username && !followingUsernames.has(stream.username))
+    const followingUsernames = new Set(following.map((ch) => ch.username))
+    return liveSnapshot.streams
+      .filter(
+        (stream) =>
+          stream.username !== user?.username && !followingUsernames.has(stream.username),
+      )
       .sort((a, b) => b.viewer_count - a.viewer_count)
-      .map(stream => toSidebarStreamer(stream, true))
-  }, [recommended, following, user?.username])
+      .map(liveStreamToSidebarStreamer)
+  }, [liveSnapshot.streams, following, user?.username])
 
   return (
     <aside className="fixed bottom-0 top-14 z-20 hidden w-[260px] flex-col border-r border-border bg-sidebar lg:flex">

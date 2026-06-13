@@ -36,10 +36,14 @@ export class ChatSocket {
     this.token = token ?? null
   }
 
-  connect() {
+  connect(onOpen?: () => void, onClose?: () => void) {
     const url = new URL(`${CHAT_BASE}/ws/${this.room}`)
     if (this.token) url.searchParams.set('token', this.token)
     this.ws = new WebSocket(url.toString())
+
+    this.ws.onopen = () => {
+      onOpen?.()
+    }
 
     this.ws.onmessage = (e) => {
       try {
@@ -49,7 +53,8 @@ export class ChatSocket {
     }
 
     this.ws.onclose = () => {
-      this.reconnectTimer = setTimeout(() => this.connect(), 3000)
+      onClose?.()
+      this.reconnectTimer = setTimeout(() => this.connect(onOpen, onClose), 3000)
     }
 
     this.ws.onerror = () => this.ws?.close()

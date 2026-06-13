@@ -10,7 +10,16 @@ export type StreamHealth = {
 
 export type LatencyLevel = "ultra" | "low" | "normal" | "high" | "unknown"
 
-export function getStreamHealth(stream: PathSummary | null): StreamHealth {
+/** Minimum inbound Mbps before the stream is considered degraded. */
+export const INBOUND_RECOMMENDED_MBPS = 1.0
+
+/** Inbound Mbps below this often causes lag / weak signal. */
+export const INBOUND_LAG_RISK_MBPS = 0.3
+
+export function getStreamHealth(
+  stream: PathSummary | null,
+  options?: { inboundMbps?: number },
+): StreamHealth {
   if (!stream?.online) {
     return {
       status: "offline",
@@ -19,7 +28,7 @@ export function getStreamHealth(stream: PathSummary | null): StreamHealth {
     }
   }
 
-  const inbound = stream.bandwidth.inboundMbps
+  const inbound = options?.inboundMbps ?? stream.bandwidth.inboundMbps
   const frameErrors = stream.inboundFramesInError ?? 0
 
   if (frameErrors > 0) {
@@ -30,19 +39,19 @@ export function getStreamHealth(stream: PathSummary | null): StreamHealth {
     }
   }
 
-  if (inbound < 0.3) {
+  if (inbound < INBOUND_LAG_RISK_MBPS) {
     return {
       status: "warning",
       label: "Weak signal",
-      description: "Inbound bitrate is very low",
+      description: "Average inbound bitrate is very low",
     }
   }
 
-  if (inbound < 1.0) {
+  if (inbound < INBOUND_RECOMMENDED_MBPS) {
     return {
       status: "warning",
       label: "Degraded",
-      description: "Bitrate below recommended levels",
+      description: "Average inbound bitrate below recommended",
     }
   }
 
@@ -91,4 +100,17 @@ export function getStreamResolution(stream: PathSummary | null): string | null {
     return `${w}×${h}`
   }
   return null
+}
+
+export function getInboundBitrateStatus(mbps: number): {
+  level: "healthy" | "degraded" | "critical"
+  label: string
+} {
+  if (mbps < INBOUND_LAG_RISK_MBPS) {
+    return { level: "critical", label: "Lag risk — bitrate very low" }
+  }
+  if (mbps < INBOUND_RECOMMENDED_MBPS) {
+    return { level: "degraded", label: "Below recommended — may stutter" }
+  }
+  return { level: "healthy", label: "Bitrate OK" }
 }

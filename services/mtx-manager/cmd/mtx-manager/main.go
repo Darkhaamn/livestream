@@ -110,8 +110,12 @@ func startServer(cfg config.Config, client *mediamtx.Client) {
 	if err != nil {
 		syncInterval = 3 * time.Second
 	}
-	go livesync.New(client, cfg.APIURL, vodSvc, thumbSvc, syncInterval).Run(ctx)
-	log.Printf("livesync: watching MediaMTX → %s (interval %s)", cfg.APIURL, syncInterval)
+	metricsInterval, err := time.ParseDuration(cfg.MetricsSampleInterval)
+	if err != nil {
+		metricsInterval = 5 * time.Second
+	}
+	go livesync.New(client, cfg.APIURL, vodSvc, thumbSvc, syncInterval, metricsInterval).Run(ctx)
+	log.Printf("livesync: watching MediaMTX → %s (interval %s, metrics %s)", cfg.APIURL, syncInterval, metricsInterval)
 
 	go func() {
 		time.Sleep(2 * time.Second)

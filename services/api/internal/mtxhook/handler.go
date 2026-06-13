@@ -52,6 +52,14 @@ type pathRequest struct {
 	RecordingPath string `json:"recording_path"`
 }
 
+type metricsRequest struct {
+	Path          string  `json:"path"`
+	InboundMbps   float64 `json:"inbound_mbps"`
+	OutboundMbps  float64 `json:"outbound_mbps"`
+	ViewerCount   int     `json:"viewer_count"`
+	FrameErrors   uint64  `json:"frame_errors"`
+}
+
 // Auth handles POST /internal/mtx/auth (MediaMTX authHTTPAddress callback).
 // MediaMTX treats any 2xx as allow, non-2xx as deny.
 func (h *Handler) Auth(c *gin.Context) {
@@ -172,6 +180,45 @@ func (h *Handler) StreamStopped(c *gin.Context) {
 		return
 	}
 	h.invalidateDiscovery(ctx)
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// StreamMetrics handles POST /internal/mtx/stream-metrics.
+// mtx-manager livesync samples bandwidth and viewer count while a path is online.
+func (h *Handler) StreamMetrics(c *gin.Context) {
+	var req metricsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+	u, ok := h.userFromPathBody(c, req.Path)
+	if !ok {
+		return
+	}
+	ctx := c.Request.Context()
+
+	var session model.StreamSession
+	err := h.db.WithContext(ctx).
+		Where("user_id = ? AND ended_at IS NULL", u.ID).
+		Order("started_at DESC").
+		First(&session).Error
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		return
+	}
+
+	sample := model.StreamMetricSample{
+		SessionID:    session.ID,
+		RecordedAt:   time.Now().UTC(),
+		InboundMbps:  req.InboundMbps,
+		OutboundMbps: req.OutboundMbps,
+		ViewerCount:  req.ViewerCount,
+		FrameErrors:  req.FrameErrors,
+	}
+	if err := h.db.WithContext(ctx).Create(&sample).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 

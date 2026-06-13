@@ -140,9 +140,9 @@ export default function ChannelPage({ username }: ChannelPageProps) {
     return (
       <div>
         <Skeleton className="aspect-video w-full rounded-none bg-muted" />
-        <div className="mx-auto max-w-6xl px-4 py-6">
+        <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6">
           <div className="flex items-center gap-4">
-            <Skeleton className="size-16 rounded-full bg-muted" />
+            <Skeleton className="size-16 shrink-0 rounded-full bg-muted" />
             <div className="space-y-2">
               <Skeleton className="h-6 w-48 bg-muted" />
               <Skeleton className="h-4 w-32 bg-muted" />
@@ -155,8 +155,8 @@ export default function ChannelPage({ username }: ChannelPageProps) {
 
   if (notFound || !user) {
     return (
-      <div className="mx-auto w-full max-w-lg px-4 py-20">
-        <div className="rounded-xl border border-border bg-card py-16 text-center">
+      <div className="mx-auto w-full max-w-lg px-4 py-16 md:px-6 md:py-24">
+        <div className="rounded-xl border border-border bg-card px-6 py-16 text-center">
           <p className="text-xl font-bold text-foreground">Channel not found</p>
           <p className="mt-2 text-sm text-muted-foreground">
             There is no channel named @{username}.
@@ -204,8 +204,8 @@ export default function ChannelPage({ username }: ChannelPageProps) {
             />
 
             {(activeVod && activeSession) || user.is_live ? (
-              <div className="player-chrome border-t px-4 py-4 sm:px-6">
-                <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="player-chrome border-t border-white/10 px-4 py-5 sm:px-6 md:py-6">
+                <div className="mx-auto flex max-w-6xl flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="mb-1.5 flex flex-wrap items-center gap-2">
                       {activeVod ? (
@@ -260,25 +260,25 @@ export default function ChannelPage({ username }: ChannelPageProps) {
       </section>
 
       {/* Profile + tabs */}
-      <section className="border-b border-border bg-card/50">
-        <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-4">
+      <section className="border-b border-border bg-card/40">
+        <div className="mx-auto w-full max-w-6xl px-4 md:px-6">
+          <div className="flex flex-col gap-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:py-8">
+            <div className="flex min-w-0 items-center gap-4 sm:gap-5">
               <ChannelAvatar
                 username={user.username}
                 displayName={user.display_name}
                 avatarUrl={user.avatar_url}
                 size="lg"
                 live={user.is_live}
-                className="!size-14 shrink-0 sm:!size-16"
+                className="!size-16 shrink-0 sm:!size-[72px]"
               />
-              <div className="min-w-0">
+              <div className="min-w-0 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="truncate text-xl font-bold text-foreground sm:text-2xl">{name}</h1>
                   {user.is_live ? <LiveBadge size="sm" /> : null}
                 </div>
                 <p className="text-sm text-muted-foreground">@{user.username}</p>
-                <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-0.5 text-sm text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
                     <IconUsers className="size-3.5" />
                     <span className="font-semibold text-foreground">{user.follower_count}</span>
@@ -302,7 +302,7 @@ export default function ChannelPage({ username }: ChannelPageProps) {
                 disabled={followBusy || !accessToken}
                 title={!accessToken ? 'Log in to follow' : undefined}
                 className={cn(
-                  'inline-flex shrink-0 items-center justify-center gap-2 rounded-md px-6 py-2.5 text-sm font-bold transition-colors disabled:opacity-60',
+                  'inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-sm font-bold transition-colors disabled:opacity-60 sm:w-auto',
                   following
                     ? 'bg-muted text-foreground hover:bg-accent'
                     : 'bg-primary text-primary-foreground hover:bg-primary/90',
@@ -314,14 +314,14 @@ export default function ChannelPage({ username }: ChannelPageProps) {
             ) : null}
           </div>
 
-          <nav className="mt-5 flex gap-1 border-t border-border pt-1">
+          <nav className="-mx-1 flex gap-1 overflow-x-auto border-t border-border px-1 pt-1">
             {TABS.map(item => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setTab(item.id)}
                 className={cn(
-                  'relative px-4 py-3 text-sm font-semibold transition-colors',
+                  'relative shrink-0 px-4 py-3.5 text-sm font-semibold transition-colors',
                   tab === item.id
                     ? 'text-foreground'
                     : 'text-muted-foreground hover:text-foreground',
@@ -329,7 +329,7 @@ export default function ChannelPage({ username }: ChannelPageProps) {
               >
                 {item.label}
                 {tab === item.id ? (
-                  <span className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-primary" />
+                  <span className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-primary" />
                 ) : null}
               </button>
             ))}
@@ -338,11 +338,11 @@ export default function ChannelPage({ username }: ChannelPageProps) {
       </section>
 
       {/* Tab content */}
-      <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <section className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6 md:py-10">
         {tab === 'home' ? (
-          <div className="space-y-8">
+          <div className="space-y-10">
             {isOwnChannel && user.is_live ? (
-              <div className="rounded-xl border border-border bg-card p-5">
+              <div className="rounded-xl border border-border bg-card p-6">
                 <h2 className="text-base font-bold text-foreground">Edit stream info</h2>
                 <div className="mt-4">
                   <StreamInfoEditor compact onSaved={() => void reloadUser()} />
@@ -374,7 +374,7 @@ export default function ChannelPage({ username }: ChannelPageProps) {
 
         {tab === 'videos' ? (
           user.is_live ? (
-            <div className="rounded-xl border border-border bg-card px-4 py-10 text-center">
+            <div className="rounded-xl border border-border bg-card px-6 py-14 text-center">
               <p className="text-sm text-muted-foreground">
                 Past broadcasts will appear here after the stream ends.
               </p>
@@ -392,27 +392,27 @@ export default function ChannelPage({ username }: ChannelPageProps) {
         ) : null}
 
         {tab === 'about' ? (
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="rounded-xl border border-border bg-card p-6">
+          <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
+            <div className="rounded-xl border border-border bg-card p-6 md:p-8">
               <h2 className="text-lg font-bold text-foreground">About {name}</h2>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                 {user.bio || `${name} has not added a bio yet.`}
               </p>
             </div>
-            <div className="rounded-xl border border-border bg-card p-6">
+            <div className="rounded-xl border border-border bg-card p-6 md:p-8">
               <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Channel details
               </h3>
-              <dl className="mt-4 space-y-3 text-sm">
-                <div className="flex justify-between gap-4 border-b border-border pb-3">
+              <dl className="mt-5 space-y-4 text-sm">
+                <div className="flex justify-between gap-4 border-b border-border pb-4">
                   <dt className="text-muted-foreground">Username</dt>
                   <dd className="font-medium text-foreground">@{user.username}</dd>
                 </div>
-                <div className="flex justify-between gap-4 border-b border-border pb-3">
+                <div className="flex justify-between gap-4 border-b border-border pb-4">
                   <dt className="text-muted-foreground">Followers</dt>
                   <dd className="font-medium text-foreground">{user.follower_count}</dd>
                 </div>
-                <div className="flex justify-between gap-4 border-b border-border pb-3">
+                <div className="flex justify-between gap-4 border-b border-border pb-4">
                   <dt className="text-muted-foreground">Member since</dt>
                   <dd className="font-medium text-foreground">
                     {new Date(user.created_at).toLocaleDateString('en-US', {

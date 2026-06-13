@@ -268,3 +268,39 @@ func (r *Repository) RegenerateStreamKey(ctx context.Context, userID string) (st
 	}
 	return newKey, nil
 }
+
+func (r *Repository) GetOpenSession(ctx context.Context, userID string) (*model.StreamSession, error) {
+	var session model.StreamSession
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND ended_at IS NULL", userID).
+		Order("started_at DESC").
+		First(&session).Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (r *Repository) GetSessionForUser(ctx context.Context, userID string, sessionID uint) (*model.StreamSession, error) {
+	var session model.StreamSession
+	err := r.db.WithContext(ctx).
+		Where("id = ? AND user_id = ?", sessionID, userID).
+		First(&session).Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (r *Repository) ListMetricSamples(ctx context.Context, sessionID uint, since time.Time) ([]model.StreamMetricSample, error) {
+	var samples []model.StreamMetricSample
+	err := r.db.WithContext(ctx).
+		Where("session_id = ? AND recorded_at >= ?", sessionID, since).
+		Order("recorded_at ASC").
+		Limit(3600).
+		Find(&samples).Error
+	if err != nil {
+		return nil, fmt.Errorf("list metric samples: %w", err)
+	}
+	return samples, nil
+}

@@ -46,6 +46,18 @@ type StreamSession struct {
 	RecordingPath *string    `json:"recording_path"`
 }
 
+// StreamMetricSample is a point-in-time snapshot of stream health metrics
+// recorded while a session is live (sampled by mtx-manager livesync).
+type StreamMetricSample struct {
+	ID           uint      `gorm:"primaryKey" json:"id"`
+	SessionID    uint      `gorm:"index:idx_session_recorded,priority:1" json:"-"`
+	RecordedAt   time.Time `gorm:"index:idx_session_recorded,priority:2" json:"recorded_at"`
+	InboundMbps  float64   `json:"inbound_mbps"`
+	OutboundMbps float64   `json:"outbound_mbps"`
+	ViewerCount  int       `json:"viewer_count"`
+	FrameErrors  uint64    `json:"frame_errors"`
+}
+
 type PublicUser struct {
 	ID             string    `json:"id"`
 	Username       string    `json:"username"`

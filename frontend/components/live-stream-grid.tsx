@@ -2,36 +2,22 @@
 
 import { IconBroadcast, IconUsers } from '@tabler/icons-react'
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useSyncExternalStore } from 'react'
 
 import { ChannelAvatar } from '@/components/stream/channel-avatar'
 import { LiveBadge } from '@/components/stream/live-badge'
 import { StreamThumbnail } from '@/components/stream/stream-thumbnail'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { api, type LiveStream } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
+import {
+  getLiveStreamsSnapshot,
+  subscribeLiveStreams,
+} from '@/lib/live-streams-store'
 import { formatViewerCount } from '@/lib/stream-health'
 import { cn } from '@/lib/utils'
+import type { LiveStream } from '@/lib/api'
 
-const LIVE_POLL_MS = 15_000
-
-function liveStreamsEqual(a: LiveStream[], b: LiveStream[]): boolean {
-  if (a.length !== b.length) return false
-  return a.every((stream, i) => {
-    const other = b[i]
-    return (
-      stream.path === other.path &&
-      stream.username === other.username &&
-      stream.stream_title === other.stream_title &&
-      stream.stream_category === other.stream_category &&
-      stream.viewer_count === other.viewer_count &&
-      stream.display_name === other.display_name
-    )
-  })
-}
-
-/** Viewer-count pill shown bottom-left on the thumbnail, Kick-style. */
 function ViewerPill({ count }: { count: number }) {
   return (
     <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-black/75 px-1.5 py-0.5 text-xs font-semibold text-white backdrop-blur-sm">
@@ -41,7 +27,6 @@ function ViewerPill({ count }: { count: number }) {
   )
 }
 
-/** Small category chip; styled as a clickable Kick category tag. */
 function CategoryChip({ category }: { category: string }) {
   if (!category) return null
   return (
@@ -184,46 +169,11 @@ function StreamCardSkeleton() {
 
 export default function LiveStreamGrid() {
   const { user } = useAuth()
-  const [streams, setStreams] = useState<LiveStream[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [initialLoading, setInitialLoading] = useState(true)
-  const inFlightRef = useRef(false)
+  const snapshot = useSyncExternalStore(subscribeLiveStreams, getLiveStreamsSnapshot, getLiveStreamsSnapshot)
 
-  useEffect(() => {
-    let active = true
-
-    async function load() {
-      if (inFlightRef.current || document.hidden) return
-      inFlightRef.current = true
-      try {
-        const data = await api.streams.live()
-        if (!active) return
-        setStreams((prev) => (liveStreamsEqual(prev, data) ? prev : data))
-        setError(null)
-      } catch (err) {
-        if (!active) return
-        setError(err instanceof Error ? err.message : 'Failed to load streams')
-      } finally {
-        inFlightRef.current = false
-        if (active) setInitialLoading(false)
-      }
-    }
-
-    void load()
-    const timer = window.setInterval(() => void load(), LIVE_POLL_MS)
-    const onVisibility = () => {
-      if (!document.hidden) void load()
-    }
-    document.addEventListener('visibilitychange', onVisibility)
-
-    return () => {
-      active = false
-      window.clearInterval(timer)
-      document.removeEventListener('visibilitychange', onVisibility)
-    }
-  }, [])
-
-  const totalViewers = streams.reduce((s, st) => s + (st.viewer_count ?? 0), 0)
+  const { streams, error, loaded, refreshing } = snapshot
+  const showSkeleton = !loaded && streams.length === 0
+  const totalViewers = streams.reduce((sum, stream) => sum + (stream.viewer_count ?? 0), 0)
   const gridStreams = streams.slice(1)
 
   return (
@@ -234,13 +184,19 @@ export default function LiveStreamGrid() {
         </div>
       )}
 
-      {initialLoading && (
+      {refreshing && streams.length > 0 ? (
+        <p className="mb-4 text-xs text-muted-foreground">Updating live channels…</p>
+      ) : null}
+
+      {showSkeleton && (
         <div className="grid gap-x-4 gap-y-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-          {Array.from({ length: 10 }).map((_, i) => <StreamCardSkeleton key={i} />)}
+          {Array.from({ length: 10 }).map((_, index) => (
+            <StreamCardSkeleton key={index} />
+          ))}
         </div>
       )}
 
-      {!initialLoading && streams.length > 0 && (
+      {!showSkeleton && streams.length > 0 && (
         <>
           <section>
             <div className="mb-4 flex items-center gap-2">
@@ -278,7 +234,7 @@ export default function LiveStreamGrid() {
         </>
       )}
 
-      {!initialLoading && !error && streams.length === 0 && (
+      {!showSkeleton && !error && streams.length === 0 && (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card/50 py-24 text-center">
           <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-primary/10">
             <IconBroadcast className="size-8 text-primary-text" />

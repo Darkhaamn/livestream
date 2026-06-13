@@ -30,6 +30,11 @@ function Badge({ kind }: { kind: string }) {
   return null
 }
 
+function messageKey(msg: ChatMessage, index: number) {
+  if (msg.id) return msg.id
+  return `${msg.type}-${msg.timestamp}-${msg.username ?? ""}-${msg.text ?? ""}-${index}`
+}
+
 function MessageBubble({ msg }: { msg: ChatMessage }) {
   if (msg.type === 'system' || msg.type === 'join' || msg.type === 'leave' || msg.type === 'error') {
     return (
@@ -66,7 +71,6 @@ export function ChatPanel({ className, streamKey }: ChatPanelProps) {
     socketRef.current = socket
 
     const unsub = socket.subscribe((msg) => {
-      setConnected(true)
       if (msg.type === 'join' || msg.type === 'leave') return
       if (msg.type === 'delete') {
         setMessages(prev => prev.filter(m => m.id !== msg.target))
@@ -92,8 +96,10 @@ export function ChatPanel({ className, streamKey }: ChatPanelProps) {
       })
     })
 
-    socket.connect()
-    setConnected(true)
+    socket.connect(
+      () => setConnected(true),
+      () => setConnected(false),
+    )
 
     return () => {
       unsub()
@@ -103,7 +109,7 @@ export function ChatPanel({ className, streamKey }: ChatPanelProps) {
 
   useEffect(() => {
     if (autoScroll) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      bottomRef.current?.scrollIntoView({ behavior: "auto", block: "end" })
     }
   }, [messages, autoScroll])
 
@@ -144,7 +150,7 @@ export function ChatPanel({ className, streamKey }: ChatPanelProps) {
             </div>
           )}
           {messages.map((msg, i) => (
-            <MessageBubble key={i} msg={msg} />
+            <MessageBubble key={messageKey(msg, i)} msg={msg} />
           ))}
           <div ref={bottomRef} />
         </div>

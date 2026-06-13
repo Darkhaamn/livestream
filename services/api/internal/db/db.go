@@ -23,7 +23,13 @@ func Migrate(db *gorm.DB) error {
 	if err := db.Exec("CREATE EXTENSION IF NOT EXISTS pgcrypto").Error; err != nil {
 		return fmt.Errorf("enable pgcrypto: %w", err)
 	}
-	if err := db.AutoMigrate(&model.User{}, &model.RefreshToken{}, &model.Follow{}, &model.StreamSession{}); err != nil {
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.RefreshToken{},
+		&model.Follow{},
+		&model.StreamSession{},
+		&model.StreamMetricSample{},
+	); err != nil {
 		return fmt.Errorf("auto migrate: %w", err)
 	}
 	return nil

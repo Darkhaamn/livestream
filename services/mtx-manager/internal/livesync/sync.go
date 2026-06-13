@@ -18,24 +18,37 @@ import (
 )
 
 type Syncer struct {
-	client   *mediamtx.Client
-	apiBase  string
-	vods     *vods.Service
-	thumbs   *thumbnails.Service
-	http     *http.Client
-	interval time.Duration
-	live     map[string]time.Time
+	client          *mediamtx.Client
+	apiBase         string
+	vods            *vods.Service
+	thumbs          *thumbnails.Service
+	http            *http.Client
+	interval        time.Duration
+	metricsInterval time.Duration
+	live            map[string]time.Time
+	lastMetrics     map[string]time.Time
 }
 
-func New(client *mediamtx.Client, apiBase string, vodSvc *vods.Service, thumbSvc *thumbnails.Service, interval time.Duration) *Syncer {
+func New(
+	client *mediamtx.Client,
+	apiBase string,
+	vodSvc *vods.Service,
+	thumbSvc *thumbnails.Service,
+	interval, metricsInterval time.Duration,
+) *Syncer {
+	if metricsInterval <= 0 {
+		metricsInterval = 5 * time.Second
+	}
 	return &Syncer{
-		client:   client,
-		apiBase:  strings.TrimRight(apiBase, "/"),
-		vods:     vodSvc,
-		thumbs:   thumbSvc,
-		http:     &http.Client{Timeout: 5 * time.Second},
-		interval: interval,
-		live:     make(map[string]time.Time),
+		client:          client,
+		apiBase:         strings.TrimRight(apiBase, "/"),
+		vods:            vodSvc,
+		thumbs:          thumbSvc,
+		http:            &http.Client{Timeout: 5 * time.Second},
+		interval:        interval,
+		metricsInterval: metricsInterval,
+		live:            make(map[string]time.Time),
+		lastMetrics:     make(map[string]time.Time),
 	}
 }
 
@@ -73,10 +86,12 @@ func (s *Syncer) sync(ctx context.Context) {
 			s.notify(ctx, "stream-started", p.Name, "")
 		}
 		online[p.Name] = started
+		s.maybeRecordMetrics(ctx, p, now)
 	}
 
 	for path, startedAt := range s.live {
 		if _, ok := online[path]; !ok {
+			delete(s.lastMetrics, path)
 			s.notify(ctx, "stream-stopped", path, "")
 			go s.attachRecording(path, startedAt)
 		}
@@ -121,6 +136,39 @@ func (s *Syncer) ensureVodThumbnail(recordingID string) {
 		return
 	}
 	log.Printf("livesync: vod thumbnail %s", recordingID)
+}
+
+func (s *Syncer) maybeRecordMetrics(ctx context.Context, p mediamtx.PathSummary, now time.Time) {
+	last, ok := s.lastMetrics[p.Name]
+	if ok && now.Sub(last) < s.metricsInterval {
+		return
+	}
+	s.lastMetrics[p.Name] = now
+	s.recordMetrics(ctx, p)
+}
+
+func (s *Syncer) recordMetrics(ctx context.Context, p mediamtx.PathSummary) {
+	body, err := json.Marshal(map[string]any{
+		"path":           p.Name,
+		"inbound_mbps":   p.Bandwidth.InboundMbps,
+		"outbound_mbps":  p.Bandwidth.OutboundMbps,
+		"viewer_count":   p.ViewerCount,
+		"frame_errors":   p.InboundFramesInError,
+	})
+	if err != nil {
+		return
+	}
+	url := s.apiBase + "/internal/mtx/stream-metrics"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return
+	}
+	_ = resp.Body.Close()
 }
 
 func (s *Syncer) notify(ctx context.Context, hook, path, recordingPath string) {

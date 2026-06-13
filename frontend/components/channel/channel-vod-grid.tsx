@@ -40,7 +40,7 @@ export function ChannelVodGrid({
 
   if (recordings.length === 0) {
     return (
-      <div className="rounded-xl border border-border bg-card px-4 py-10 text-center">
+      <div className="rounded-xl border border-border bg-card px-6 py-14 text-center">
         <p className="text-sm text-muted-foreground">{emptyMessage}</p>
       </div>
     )
@@ -48,8 +48,8 @@ export function ChannelVodGrid({
 
   return (
     <section>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-bold tracking-tight text-foreground">{title}</h2>
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">{title}</h2>
         {showViewAll && recordings.length > (limit ?? 0) ? (
           <button
             type="button"
@@ -61,7 +61,7 @@ export function ChannelVodGrid({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4">
         {visible.map(({ session, vod }) => {
           const duration = formatSessionDuration(session)
           const isActive = activeId === vod.id
@@ -76,7 +76,7 @@ export function ChannelVodGrid({
                 isActive ? "ring-2 ring-primary" : "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
               )}
             >
-              <div className="relative aspect-video overflow-hidden rounded-lg bg-black">
+              <div className="relative aspect-video overflow-hidden bg-black">
                 {session.recording_path ? (
                   <VodThumbnail
                     recordingPath={session.recording_path}
@@ -98,7 +98,7 @@ export function ChannelVodGrid({
                 </span>
               </div>
 
-              <div className="mt-2 flex items-start gap-2 px-0.5">
+              <div className="flex items-start gap-3 p-4">
                 <ChannelAvatar
                   username={channel.username}
                   displayName={channel.display_name}

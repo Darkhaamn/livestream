@@ -1,3 +1,7 @@
+import type { StreamMetricsResponse } from '@/lib/stream-metrics'
+
+export type { StreamMetricsResponse, StreamMetricSample } from '@/lib/stream-metrics'
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8081'
 
 export interface TokenPair {
@@ -120,6 +124,12 @@ export const api = {
         method: 'POST',
         headers: authHeader(token),
       }),
+    streamMetrics: (token: string, sessionId?: number) => {
+      const query = sessionId ? `?session_id=${sessionId}` : ''
+      return request<StreamMetricsResponse>(`/api/v1/users/me/stream-metrics${query}`, {
+        headers: authHeader(token),
+      })
+    },
     followStatus: (token: string, username: string) =>
       request<{ following: boolean }>(`/api/v1/users/${username}/follow-status`, {
         headers: authHeader(token),

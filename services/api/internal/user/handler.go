@@ -2,6 +2,7 @@ package user
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/darkhanbayarerdenebat/livestream-api/internal/auth"
 	"github.com/darkhanbayarerdenebat/livestream-api/internal/cache"
+	"github.com/darkhanbayarerdenebat/livestream-api/internal/model"
 )
 
 type Handler struct {
@@ -313,4 +315,76 @@ func (h *Handler) ListFollowingStreams(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, streams)
+}
+
+type StreamMetricSampleResponse struct {
+	RecordedAt   time.Time `json:"recorded_at"`
+	InboundMbps  float64   `json:"inbound_mbps"`
+	OutboundMbps float64   `json:"outbound_mbps"`
+	ViewerCount  int       `json:"viewer_count"`
+	FrameErrors  uint64    `json:"frame_errors"`
+}
+
+type StreamMetricsResponse struct {
+	SessionID uint                       `json:"session_id"`
+	StartedAt time.Time                  `json:"started_at"`
+	EndedAt   *time.Time                 `json:"ended_at"`
+	Samples   []StreamMetricSampleResponse `json:"samples"`
+}
+
+// GetStreamMetrics handles GET /users/me/stream-metrics (auth).
+// Returns metric samples for the current live session, or ?session_id= for a past one.
+func (h *Handler) GetStreamMetrics(c *gin.Context) {
+	userID := c.GetString("user_id")
+	ctx := c.Request.Context()
+
+	var session *model.StreamSession
+	var err error
+
+	if sid := c.Query("session_id"); sid != "" {
+		var id uint
+		if _, parseErr := fmt.Sscan(sid, &id); parseErr != nil || id == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid session_id"})
+			return
+		}
+		session, err = h.repo.GetSessionForUser(ctx, userID, id)
+	} else {
+		session, err = h.repo.GetOpenSession(ctx, userID)
+	}
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no active stream session"})
+		return
+	}
+
+	since := session.StartedAt
+	if session.EndedAt != nil {
+		lookback := session.EndedAt.Add(-3 * time.Hour)
+		if lookback.After(since) {
+			since = lookback
+		}
+	}
+
+	samples, err := h.repo.ListMetricSamples(ctx, session.ID, since)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load metrics"})
+		return
+	}
+
+	out := make([]StreamMetricSampleResponse, 0, len(samples))
+	for _, s := range samples {
+		out = append(out, StreamMetricSampleResponse{
+			RecordedAt:   s.RecordedAt,
+			InboundMbps:  s.InboundMbps,
+			OutboundMbps: s.OutboundMbps,
+			ViewerCount:  s.ViewerCount,
+			FrameErrors:  s.FrameErrors,
+		})
+	}
+
+	c.JSON(http.StatusOK, StreamMetricsResponse{
+		SessionID: session.ID,
+		StartedAt: session.StartedAt,
+		EndedAt:   session.EndedAt,
+		Samples:   out,
+	})
 }

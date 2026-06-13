@@ -17,10 +17,12 @@ type HealthBadgeProps = {
   stream: PathSummary | null
   className?: string
   showDot?: boolean
+  /** Smoothed inbound Mbps — avoids flicker from instant samples. */
+  inboundMbps?: number
 }
 
-export function HealthBadge({ stream, className, showDot = true }: HealthBadgeProps) {
-  const health = getStreamHealth(stream)
+export function HealthBadge({ stream, className, showDot = true, inboundMbps }: HealthBadgeProps) {
+  const health = getStreamHealth(stream, { inboundMbps })
 
   return (
     <Badge
@@ -36,8 +38,8 @@ export function HealthBadge({ stream, className, showDot = true }: HealthBadgePr
           className={cn(
             "inline-block size-2 rounded-full",
             health.status === "healthy" && "bg-emerald-400",
-            health.status === "warning" && "bg-amber-400 animate-pulse",
-            health.status === "critical" && "bg-red-500 animate-pulse",
+            health.status === "warning" && "bg-amber-400",
+            health.status === "critical" && "bg-red-500",
             health.status === "offline" && "bg-zinc-500",
           )}
         />

@@ -112,28 +112,22 @@ export function ChannelHero({ user, streamKey, isLive, activeVod, onClearVod }: 
   }
 
   return (
-    <div
-      className={cn(
-        "relative w-full overflow-hidden border-b border-border",
-        "bg-muted/40 px-4 py-8 sm:px-6 sm:py-10",
-      )}
-    >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_50%,rgba(83,252,24,0.06),transparent_55%)] dark:bg-[radial-gradient(ellipse_at_20%_50%,rgba(83,252,24,0.1),transparent_55%)]" />
+    <div className="relative flex min-h-[200px] w-full items-center justify-center overflow-hidden border-b border-border bg-muted/30 sm:min-h-[240px]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(83,252,24,0.08),transparent_60%)] dark:bg-[radial-gradient(ellipse_at_50%_0%,rgba(83,252,24,0.12),transparent_60%)]" />
 
-      <div className="relative mx-auto flex max-w-6xl flex-col items-center gap-2 text-center sm:flex-row sm:justify-center sm:gap-3">
-        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+      <div className="relative mx-auto flex w-full max-w-6xl flex-col items-center gap-4 px-4 py-10 text-center md:px-6 md:py-14">
+        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-muted-foreground">
           <IconBroadcast className="size-3.5" />
           Offline
         </div>
-        <p className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
-          {displayName} is offline
-        </p>
-        <span className="hidden text-muted-foreground/50 sm:inline" aria-hidden>
-          ·
-        </span>
-        <p className="text-sm text-muted-foreground">
-          Check past broadcasts below
-        </p>
+        <div className="space-y-2">
+          <p className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+            {displayName} is offline
+          </p>
+          <p className="text-sm text-muted-foreground sm:text-base">
+            Check past broadcasts below
+          </p>
+        </div>
       </div>
     </div>
   )

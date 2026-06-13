@@ -89,6 +89,7 @@ func main() {
 			authed.PUT("/me", userHandler.UpdateMe)
 			authed.POST("/me/stream-key", userHandler.RegenerateKey)
 			authed.GET("/me/following", userHandler.ListMyFollowing)
+			authed.GET("/me/stream-metrics", userHandler.GetStreamMetrics)
 				authed.GET("/:username/follow-status", userHandler.FollowStatus)
 				authed.POST("/:username/follow", userHandler.Follow)
 				authed.DELETE("/:username/follow", userHandler.Unfollow)
@@ -107,6 +108,7 @@ func main() {
 		mtx.POST("/auth", mtxHandler.Auth)
 		mtx.POST("/stream-started", mtxHandler.StreamStarted)
 		mtx.POST("/stream-stopped", mtxHandler.StreamStopped)
+		mtx.POST("/stream-metrics", mtxHandler.StreamMetrics)
 		mtx.POST("/recording-attached", mtxHandler.RecordingAttached)
 	}
 

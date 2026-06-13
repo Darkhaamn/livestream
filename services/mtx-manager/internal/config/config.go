@@ -21,8 +21,9 @@ type Config struct {
 	ThumbnailInterval string
 	RecordingsDir     string
 	RedisURL          string
-	APIURL            string
-	LiveSyncInterval  string
+	APIURL                 string
+	LiveSyncInterval       string
+	MetricsSampleInterval  string
 }
 
 func Load() Config {
@@ -45,7 +46,8 @@ func Load() Config {
 		RecordingsDir:     recordingsDir,
 		RedisURL:          envOr("REDIS_URL", "redis://:redis_secret@localhost:6379/0"),
 		APIURL:            envOr("API_URL", "http://localhost:8081"),
-		LiveSyncInterval:  envOr("LIVE_SYNC_INTERVAL", "3s"),
+		LiveSyncInterval:      envOr("LIVE_SYNC_INTERVAL", "3s"),
+		MetricsSampleInterval: envOr("METRICS_SAMPLE_INTERVAL", "5s"),
 	}
 }
 

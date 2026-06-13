@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-'use client'
+"use client"
 
 import {
   IconBroadcast,
@@ -10,27 +10,27 @@ import {
   IconSun,
   IconUser,
   IconVideo,
-} from '@tabler/icons-react'
-import { useTheme } from 'next-themes'
-import Link from 'next/link'
-import { useEffect, useState } from 'react'
+} from "@tabler/icons-react"
+import { useTheme } from "next-themes"
+import Link from "next/link"
+import { useEffect, useState } from "react"
 
-import { AuthModal } from '@/components/auth/auth-modal'
-import { AppSidebar } from '@/components/app-sidebar'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
+import { AuthModal } from "@/components/auth/auth-modal"
+import { AppSidebar } from "@/components/app-sidebar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from "@/components/ui/dropdown-menu"
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
-} from '@/components/ui/input-group'
-import { useAuth } from '@/lib/auth-context'
+} from "@/components/ui/input-group"
+import { useAuth } from "@/lib/auth-context"
 
 type AppShellProps = { children: React.ReactNode }
 
@@ -39,15 +39,21 @@ export default function AppShell({ children }: AppShellProps) {
   const { user, isLoading, logout } = useAuth()
   const [themeMounted, setThemeMounted] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
-  const [authTab, setAuthTab] = useState<'login' | 'register'>('login')
+  const [authTab, setAuthTab] = useState<"login" | "register">("login")
 
-  const openLogin = () => { setAuthTab('login'); setAuthOpen(true) }
-  const openRegister = () => { setAuthTab('register'); setAuthOpen(true) }
+  const openLogin = () => {
+    setAuthTab("login")
+    setAuthOpen(true)
+  }
+  const openRegister = () => {
+    setAuthTab("register")
+    setAuthOpen(true)
+  }
 
   useEffect(() => setThemeMounted(true), [])
 
   const toggleTheme = () => {
-    setTheme(resolvedTheme === 'light' ? 'dark' : 'light')
+    setTheme(resolvedTheme === "light" ? "dark" : "light")
   }
 
   return (
@@ -60,7 +66,7 @@ export default function AppShell({ children }: AppShellProps) {
             <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
               <IconVideo className="size-4 text-primary-foreground" />
             </div>
-            <span className="text-base font-extrabold italic tracking-tight text-foreground">
+            <span className="text-base font-extrabold tracking-tight text-foreground italic">
               LIVESTREAM
             </span>
           </Link>
@@ -92,7 +98,9 @@ export default function AppShell({ children }: AppShellProps) {
                         <Button variant="ghost" className="gap-1.5 px-2">
                           <Avatar className="size-7">
                             <AvatarFallback className="bg-primary text-xs font-bold text-primary-foreground">
-                              {(user.display_name ?? user.username).charAt(0).toUpperCase()}
+                              {(user.display_name ?? user.username)
+                                .charAt(0)
+                                .toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
                           <span>{user.display_name ?? user.username}</span>
@@ -115,10 +123,19 @@ export default function AppShell({ children }: AppShellProps) {
                   </>
                 ) : (
                   <>
-                    <Button variant="secondary" size="lg" className="rounded-lg" onClick={openLogin}>
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      className="rounded-lg"
+                      onClick={openLogin}
+                    >
                       Log in
                     </Button>
-                    <Button size="lg" className="rounded-lg" onClick={openRegister}>
+                    <Button
+                      size="lg"
+                      className="rounded-lg"
+                      onClick={openRegister}
+                    >
                       Sign up
                     </Button>
                   </>
@@ -133,9 +150,15 @@ export default function AppShell({ children }: AppShellProps) {
               onClick={toggleTheme}
               aria-label="Toggle theme"
             >
-              {themeMounted
-                ? (resolvedTheme === 'dark' ? <IconSun /> : <IconMoon />)
-                : <span className="size-4" aria-hidden />}
+              {themeMounted ? (
+                resolvedTheme === "dark" ? (
+                  <IconSun />
+                ) : (
+                  <IconMoon />
+                )
+              ) : (
+                <span className="size-4" aria-hidden />
+              )}
             </Button>
           </nav>
         </div>
@@ -145,7 +168,11 @@ export default function AppShell({ children }: AppShellProps) {
 
       <main className="lg:pl-[260px]">{children}</main>
 
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} defaultTab={authTab} />
+      <AuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        defaultTab={authTab}
+      />
     </div>
   )
 }

@@ -13,7 +13,10 @@ export function buildRtmpUrl(streamKey: string, rtmpBase: string) {
   return `${rtmpBase.replace(/\/+$/, "")}/${key}`
 }
 
-export function buildWebRtcUrl(streamKey: string, baseUrl = DEFAULT_WEBRTC_BASE) {
+export function buildWebRtcUrl(
+  streamKey: string,
+  baseUrl = DEFAULT_WEBRTC_BASE
+) {
   const key = streamKey.trim().replace(/^\/+|\/+$/g, "")
   return `${baseUrl.replace(/\/+$/, "")}/${key}/whep`
 }

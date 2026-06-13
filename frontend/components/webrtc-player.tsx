@@ -75,7 +75,8 @@ function WebRtcPlayerSession({
         leaseRef.current = null
         setPeer(null)
         video.srcObject = null
-        const message = err instanceof Error ? err.message : "WebRTC playback failed"
+        const message =
+          err instanceof Error ? err.message : "WebRTC playback failed"
         setError(message)
         setUseFallback(true)
       })
@@ -112,7 +113,7 @@ function WebRtcPlayerSession({
       data-player-shell
       className={cn(
         "group relative aspect-video w-full overflow-hidden bg-black",
-        className ?? "rounded-lg ring-1 ring-white/10",
+        className ?? "rounded-lg ring-1 ring-white/10"
       )}
     >
       <video

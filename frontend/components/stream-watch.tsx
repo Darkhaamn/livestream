@@ -39,8 +39,11 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
   const [channelUser, setChannelUser] = useState<User | null>(null)
   const [sessions, setSessions] = useState<StreamSession[]>([])
 
-  const channelUsername = streamKey.startsWith("live/") ? streamKey.slice("live/".length) : null
-  const isOwnChannel = !!user && !!channelUsername && user.username === channelUsername
+  const channelUsername = streamKey.startsWith("live/")
+    ? streamKey.slice("live/".length)
+    : null
+  const isOwnChannel =
+    !!user && !!channelUsername && user.username === channelUsername
   const canFollow = !!channelUsername && !!accessToken && !isOwnChannel
 
   useEffect(() => {
@@ -48,9 +51,15 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
     let active = true
     api.users
       .followStatus(accessToken, channelUsername)
-      .then(r => { if (active) setFollowing(r.following) })
-      .catch(() => { if (active) setFollowing(false) })
-    return () => { active = false }
+      .then((r) => {
+        if (active) setFollowing(r.following)
+      })
+      .catch(() => {
+        if (active) setFollowing(false)
+      })
+    return () => {
+      active = false
+    }
   }, [channelUsername, accessToken, canFollow])
 
   async function toggleFollow() {
@@ -73,7 +82,7 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
     let active = true
     api.users
       .getByUsername(channelUsername)
-      .then(data => {
+      .then((data) => {
         if (active) setChannelUser(data)
       })
       .catch(() => {
@@ -90,7 +99,7 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
     const load = () => {
       api.users
         .sessions(channelUsername)
-        .then(data => {
+        .then((data) => {
           if (active) setSessions(Array.isArray(data) ? data : [])
         })
         .catch(() => {
@@ -105,11 +114,15 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
     }
   }, [channelUsername])
 
-  const activeSession = activeVod ? findSessionForVod(activeVod, sessions) : null
+  const activeSession = activeVod
+    ? findSessionForVod(activeVod, sessions)
+    : null
 
   const fallbackDisplay = parseStreamDisplay(streamKey)
-  const streamTitle = activeSession?.title ?? channelUser?.stream_title ?? fallbackDisplay.title
-  const category = activeSession?.category ?? channelUser?.stream_category ?? null
+  const streamTitle =
+    activeSession?.title ?? channelUser?.stream_title ?? fallbackDisplay.title
+  const category =
+    activeSession?.category ?? channelUser?.stream_category ?? null
   const streamDescription =
     activeSession?.description ?? channelUser?.stream_description ?? null
   const display =
@@ -120,7 +133,12 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
           avatar: channelUsername.charAt(0).toUpperCase(),
         }
       : channelUsername
-        ? { ...fallbackDisplay, title: streamTitle, avatar: channelUsername.charAt(0).toUpperCase(), channel: channelUsername }
+        ? {
+            ...fallbackDisplay,
+            title: streamTitle,
+            avatar: channelUsername.charAt(0).toUpperCase(),
+            channel: channelUsername,
+          }
         : { ...fallbackDisplay, title: streamTitle }
   const channelHref = channelUsername ? `/${channelUsername}` : "/"
 
@@ -136,7 +154,8 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
         setError(null)
       } catch (err) {
         if (!active) return
-        const message = err instanceof Error ? err.message : "Failed to load stream"
+        const message =
+          err instanceof Error ? err.message : "Failed to load stream"
         if (message === "not found") {
           setStream(null)
           setError(null)
@@ -171,7 +190,9 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
   async function handleShare() {
     const url = window.location.href
     if (navigator.share) {
-      await navigator.share({ title: display.title, url }).catch(() => undefined)
+      await navigator
+        .share({ title: display.title, url })
+        .catch(() => undefined)
       return
     }
     await navigator.clipboard.writeText(url)
@@ -182,7 +203,7 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
   return (
     <div className="flex flex-col bg-background lg:flex-row">
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="relative w-full player-stage">
+        <div className="player-stage relative w-full">
           {error ? (
             <div className="border-b border-destructive/20 bg-destructive/10 px-4 py-2 text-sm text-destructive">
               {error}
@@ -194,7 +215,7 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
               <div
                 className={cn(
                   "absolute inset-0",
-                  activeVod && "invisible pointer-events-none",
+                  activeVod && "pointer-events-none invisible"
                 )}
                 aria-hidden={!!activeVod}
               >
@@ -221,9 +242,13 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
               <Skeleton className="aspect-video w-full rounded-none bg-muted" />
             ) : !showLivePlayer && stream && !isLive ? (
               <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 bg-black">
-                <p className="text-lg font-bold tracking-tight text-neutral-100">Channel is offline</p>
+                <p className="text-lg font-bold tracking-tight text-neutral-100">
+                  Channel is offline
+                </p>
                 {hasVods ? (
-                  <p className="text-sm text-neutral-400">Watch a past broadcast below</p>
+                  <p className="text-sm text-neutral-400">
+                    Watch a past broadcast below
+                  </p>
                 ) : null}
               </div>
             ) : null}
@@ -247,7 +272,7 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
                 href={channelHref}
                 className={cn(
                   "flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-foreground",
-                  isLive ? "ring-2 ring-primary" : "ring-1 ring-border",
+                  isLive ? "ring-2 ring-primary" : "ring-1 ring-border"
                 )}
               >
                 {display.avatar}
@@ -261,7 +286,9 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
               >
                 {display.channel}
               </Link>
-              <p className="truncate text-sm text-muted-foreground">{display.title}</p>
+              <p className="truncate text-sm text-muted-foreground">
+                {display.title}
+              </p>
               {streamDescription ? (
                 <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
                   {streamDescription}
@@ -320,11 +347,19 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
                 disabled={followBusy}
                 className="gap-1.5"
               >
-                <IconHeart className={cn("size-4", !following && "fill-current")} />
+                <IconHeart
+                  className={cn("size-4", !following && "fill-current")}
+                />
                 {following ? "Following" : "Follow"}
               </Button>
             ) : null}
-            <Button type="button" variant="secondary" size="sm" onClick={() => void handleShare()} className="gap-1.5">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => void handleShare()}
+              className="gap-1.5"
+            >
               <IconShare className="size-4" />
               {copied ? "Copied!" : "Share"}
             </Button>
@@ -338,7 +373,7 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
             sessions={sessions}
             onSelect={setActiveVod}
             activeId={activeVod?.id ?? null}
-            onLoaded={count => setHasVods(count > 0)}
+            onLoaded={(count) => setHasVods(count > 0)}
           />
         ) : null}
 
@@ -357,7 +392,7 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
         </div>
       </div>
 
-      <aside className="flex h-[320px] w-full shrink-0 flex-col border-t border-border lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:w-[340px] lg:border-l lg:border-t-0 xl:w-[380px]">
+      <aside className="flex h-[320px] w-full shrink-0 flex-col border-t border-border lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:w-[340px] lg:border-t-0 lg:border-l xl:w-[380px]">
         <ChatPanel streamKey={streamKey} />
       </aside>
     </div>

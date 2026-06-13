@@ -17,7 +17,10 @@ export function useWebRtcLatency(peer: RTCPeerConnection | null) {
         let rttMs: number | null = null
 
         stats.forEach((report) => {
-          if (report.type === "candidate-pair" && report.state === "succeeded") {
+          if (
+            report.type === "candidate-pair" &&
+            report.state === "succeeded"
+          ) {
             const rtt = report.currentRoundTripTime
             if (typeof rtt === "number" && rtt > 0) {
               rttMs = rtt * 1000

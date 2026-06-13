@@ -27,7 +27,10 @@ type VodListProps = {
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B"
   const units = ["B", "KB", "MB", "GB", "TB"]
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  const i = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1
+  )
   const value = bytes / 1024 ** i
   return `${value >= 10 || i === 0 ? Math.round(value) : value.toFixed(1)} ${units[i]}`
 }
@@ -68,7 +71,7 @@ export function VodList({
     let active = true
     api.users
       .getByUsername(username)
-      .then(data => {
+      .then((data) => {
         if (active) setFetchedChannel(data)
       })
       .catch(() => {
@@ -84,7 +87,7 @@ export function VodList({
     let active = true
     api.users
       .sessions(username)
-      .then(data => {
+      .then((data) => {
         if (active) setFetchedSessions(Array.isArray(data) ? data : [])
       })
       .catch(() => {
@@ -97,8 +100,10 @@ export function VodList({
 
   const recordings = useMemo(() => {
     return sessionsWithRecordings(sessions)
-      .map(session => ({ session, vod: sessionToVod(session) }))
-      .filter((item): item is { session: StreamSession; vod: Vod } => item.vod != null)
+      .map((session) => ({ session, vod: sessionToVod(session) }))
+      .filter(
+        (item): item is { session: StreamSession; vod: Vod } => item.vod != null
+      )
   }, [sessions])
 
   const onLoadedRef = useRef(onLoaded)
@@ -113,11 +118,12 @@ export function VodList({
 
   if (recordings.length === 0) return null
 
-  const displayName = channel?.display_name ?? channel?.username ?? username ?? "Streamer"
+  const displayName =
+    channel?.display_name ?? channel?.username ?? username ?? "Streamer"
 
   return (
     <div className="px-4 py-4">
-      <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-muted-foreground">
+      <h2 className="mb-3 text-sm font-bold tracking-widest text-muted-foreground uppercase">
         Past broadcasts
       </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -132,7 +138,9 @@ export function VodList({
               onClick={() => onSelect(vod)}
               className={cn(
                 "group overflow-hidden rounded-xl border border-border bg-card text-left transition-all",
-                isActive ? "ring-2 ring-primary" : "hover:border-primary/40 hover:shadow-md",
+                isActive
+                  ? "ring-2 ring-primary"
+                  : "hover:border-primary/40 hover:shadow-md"
               )}
             >
               <div className="relative aspect-video overflow-hidden bg-black">
@@ -148,7 +156,7 @@ export function VodList({
                 )}
                 <VodPlayOverlay />
                 {duration ? (
-                  <span className="absolute left-2 top-2 rounded bg-black/75 px-1.5 py-0.5 text-[11px] font-bold text-white">
+                  <span className="absolute top-2 left-2 rounded bg-black/75 px-1.5 py-0.5 text-[11px] font-bold text-white">
                     {duration}
                   </span>
                 ) : null}
@@ -178,7 +186,9 @@ export function VodList({
                   </span>
                   <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                     {session.category ? (
-                      <span className="rounded-md bg-muted px-1.5 py-0.5">{session.category}</span>
+                      <span className="rounded-md bg-muted px-1.5 py-0.5">
+                        {session.category}
+                      </span>
                     ) : null}
                     <span>{formatStartedAt(session.started_at)}</span>
                   </span>

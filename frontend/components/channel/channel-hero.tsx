@@ -20,7 +20,13 @@ type ChannelHeroProps = {
   onClearVod: () => void
 }
 
-export function ChannelHero({ user, streamKey, isLive, activeVod, onClearVod }: ChannelHeroProps) {
+export function ChannelHero({
+  user,
+  streamKey,
+  isLive,
+  activeVod,
+  onClearVod,
+}: ChannelHeroProps) {
   const [liveStream, setLiveStream] = useState<PathSummary | null>(null)
   const stream = isLive ? liveStream : null
   const displayName = user.display_name ?? user.username
@@ -34,7 +40,7 @@ export function ChannelHero({ user, streamKey, isLive, activeVod, onClearVod }: 
     const load = () => {
       if (document.hidden) return
       getPath(streamKey)
-        .then(data => {
+        .then((data) => {
           if (active) setLiveStream(data)
         })
         .catch(() => {
@@ -49,10 +55,15 @@ export function ChannelHero({ user, streamKey, isLive, activeVod, onClearVod }: 
     }
   }, [isLive, streamKey])
 
-  useViewerPresence(streamKey, isLive && !activeVod && (stream?.online ?? user.is_live))
+  useViewerPresence(
+    streamKey,
+    isLive && !activeVod && (stream?.online ?? user.is_live)
+  )
 
   if (isLive) {
-    const poster = activeVod?.id ? buildVodThumbnailUrl(activeVod.id) : undefined
+    const poster = activeVod?.id
+      ? buildVodThumbnailUrl(activeVod.id)
+      : undefined
 
     return (
       <div className="relative aspect-video w-full bg-black">
@@ -60,7 +71,7 @@ export function ChannelHero({ user, streamKey, isLive, activeVod, onClearVod }: 
         <div
           className={cn(
             "absolute inset-0",
-            activeVod && "invisible pointer-events-none",
+            activeVod && "pointer-events-none invisible"
           )}
           aria-hidden={!!activeVod}
         >
@@ -78,7 +89,7 @@ export function ChannelHero({ user, streamKey, isLive, activeVod, onClearVod }: 
             <button
               type="button"
               onClick={onClearVod}
-              className="absolute right-4 top-4 z-20 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-lg hover:bg-primary/90"
+              className="absolute top-4 right-4 z-20 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-lg hover:bg-primary/90"
             >
               <IconPlayerPlay className="size-3.5" />
               Back to live
@@ -114,7 +125,7 @@ export function ChannelHero({ user, streamKey, isLive, activeVod, onClearVod }: 
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(83,252,24,0.08),transparent_60%)] dark:bg-[radial-gradient(ellipse_at_50%_0%,rgba(83,252,24,0.12),transparent_60%)]" />
 
       <div className="relative mx-auto flex w-full max-w-6xl flex-col items-center gap-4 px-4 py-10 text-center md:px-6 md:py-14">
-        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-xs font-bold tracking-widest text-muted-foreground uppercase">
           <IconBroadcast className="size-3.5" />
           Offline
         </div>

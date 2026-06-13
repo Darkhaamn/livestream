@@ -38,7 +38,10 @@ export function rollingMean(values: number[], window: number): number {
   return mean(values.slice(-window))
 }
 
-export function movingAverageSeries(values: number[], window: number): number[] {
+export function movingAverageSeries(
+  values: number[],
+  window: number
+): number[] {
   return values.map((_, index) => {
     const start = Math.max(0, index - window + 1)
     return mean(values.slice(start, index + 1))
@@ -47,21 +50,21 @@ export function movingAverageSeries(values: number[], window: number): number[] 
 
 export function averageRecentInbound(
   samples: StreamMetricSample[],
-  window = METRICS_ROLLING_WINDOW,
+  window = METRICS_ROLLING_WINDOW
 ): number {
   return rollingMean(
     samples.map((s) => s.inbound_mbps),
-    window,
+    window
   )
 }
 
 export function averageRecentOutbound(
   samples: StreamMetricSample[],
-  window = METRICS_ROLLING_WINDOW,
+  window = METRICS_ROLLING_WINDOW
 ): number {
   return rollingMean(
     samples.map((s) => s.outbound_mbps),
-    window,
+    window
   )
 }
 
@@ -75,11 +78,19 @@ export type SmoothedChartPoint = {
   frameErrors: number
 }
 
-export function buildSmoothedChartPoints(samples: StreamMetricSample[]): SmoothedChartPoint[] {
+export function buildSmoothedChartPoints(
+  samples: StreamMetricSample[]
+): SmoothedChartPoint[] {
   const inboundRaw = samples.map((s) => s.inbound_mbps)
   const outboundRaw = samples.map((s) => s.outbound_mbps)
-  const inboundSmooth = movingAverageSeries(inboundRaw, METRICS_CHART_SMOOTH_WINDOW)
-  const outboundSmooth = movingAverageSeries(outboundRaw, METRICS_CHART_SMOOTH_WINDOW)
+  const inboundSmooth = movingAverageSeries(
+    inboundRaw,
+    METRICS_CHART_SMOOTH_WINDOW
+  )
+  const outboundSmooth = movingAverageSeries(
+    outboundRaw,
+    METRICS_CHART_SMOOTH_WINDOW
+  )
 
   return samples.map((sample, index) => ({
     time: formatMetricTime(sample.recorded_at),
@@ -107,7 +118,7 @@ function coefficientOfVariation(values: number[]): number {
 }
 
 export function computeStreamStability(
-  samples: StreamMetricSample[],
+  samples: StreamMetricSample[]
 ): StreamStability {
   if (samples.length < 5) {
     return {
@@ -121,7 +132,9 @@ export function computeStreamStability(
   const inboundRaw = samples.map((s) => s.inbound_mbps).filter((v) => v > 0)
   const inbound =
     inboundRaw.length > 0
-      ? movingAverageSeries(inboundRaw, METRICS_CHART_SMOOTH_WINDOW).filter((v) => v > 0)
+      ? movingAverageSeries(inboundRaw, METRICS_CHART_SMOOTH_WINDOW).filter(
+          (v) => v > 0
+        )
       : []
   const inboundCv = coefficientOfVariation(inbound)
 

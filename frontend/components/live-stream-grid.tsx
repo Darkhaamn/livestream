@@ -1,22 +1,22 @@
-'use client'
+"use client"
 
-import { IconBroadcast, IconUsers } from '@tabler/icons-react'
-import Link from 'next/link'
-import { useSyncExternalStore } from 'react'
+import { IconBroadcast, IconUsers } from "@tabler/icons-react"
+import Link from "next/link"
+import { useSyncExternalStore } from "react"
 
-import { ChannelAvatar } from '@/components/stream/channel-avatar'
-import { LiveBadge } from '@/components/stream/live-badge'
-import { StreamThumbnail } from '@/components/stream/stream-thumbnail'
-import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
-import { useAuth } from '@/lib/auth-context'
+import { ChannelAvatar } from "@/components/stream/channel-avatar"
+import { LiveBadge } from "@/components/stream/live-badge"
+import { StreamThumbnail } from "@/components/stream/stream-thumbnail"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useAuth } from "@/lib/auth-context"
 import {
   getLiveStreamsSnapshot,
   subscribeLiveStreams,
-} from '@/lib/live-streams-store'
-import { formatViewerCount } from '@/lib/stream-health'
-import { cn } from '@/lib/utils'
-import type { LiveStream } from '@/lib/api'
+} from "@/lib/live-streams-store"
+import { formatViewerCount } from "@/lib/stream-health"
+import { cn } from "@/lib/utils"
+import type { LiveStream } from "@/lib/api"
 
 function ViewerPill({ count }: { count: number }) {
   return (
@@ -42,13 +42,16 @@ function FeaturedStream({ stream }: { stream: LiveStream }) {
 
   return (
     <div className="group grid overflow-hidden rounded-xl border border-border bg-card lg:grid-cols-[1.6fr_1fr]">
-      <Link href={watchUrl} className="relative block w-full overflow-hidden bg-background">
+      <Link
+        href={watchUrl}
+        className="relative block w-full overflow-hidden bg-background"
+      >
         <div className="relative aspect-video">
           <StreamThumbnail
             streamKey={stream.path}
             className="transition-transform duration-500 group-hover:scale-105"
           />
-          <div className="absolute left-3 top-3">
+          <div className="absolute top-3 left-3">
             <LiveBadge size="md" />
           </div>
           <ViewerPill count={stream.viewer_count} />
@@ -75,19 +78,24 @@ function FeaturedStream({ stream }: { stream: LiveStream }) {
             </Link>
             <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
               <span className="size-2 rounded-full bg-destructive" />
-              <span className="font-semibold text-foreground">{formatViewerCount(stream.viewer_count)}</span>
+              <span className="font-semibold text-foreground">
+                {formatViewerCount(stream.viewer_count)}
+              </span>
               viewers
             </div>
           </div>
         </div>
 
-        <h1 className="line-clamp-2 text-xl font-bold leading-tight tracking-tight text-foreground lg:text-2xl">
+        <h1 className="line-clamp-2 text-xl leading-tight font-bold tracking-tight text-foreground lg:text-2xl">
           {stream.stream_title}
         </h1>
 
         <CategoryChip category={stream.stream_category} />
 
-        <Button asChild className="w-fit bg-primary px-6 font-semibold text-primary-foreground hover:bg-primary/90">
+        <Button
+          asChild
+          className="w-fit bg-primary px-6 font-semibold text-primary-foreground hover:bg-primary/90"
+        >
           <Link href={watchUrl}>Watch now</Link>
         </Button>
       </div>
@@ -104,15 +112,15 @@ function StreamCard({ stream }: { stream: LiveStream }) {
       <Link href={watchUrl} className="block">
         <div
           className={cn(
-            'relative aspect-video overflow-hidden rounded-lg bg-card',
-            'ring-0 ring-primary transition-all duration-200 group-hover:ring-2'
+            "relative aspect-video overflow-hidden rounded-lg bg-card",
+            "ring-0 ring-primary transition-all duration-200 group-hover:ring-2"
           )}
         >
           <StreamThumbnail
             streamKey={stream.path}
             className="transition-transform duration-300 group-hover:scale-105"
           />
-          <div className="absolute left-2.5 top-2.5">
+          <div className="absolute top-2.5 left-2.5">
             <LiveBadge size="sm" />
           </div>
           <ViewerPill count={stream.viewer_count} />
@@ -133,7 +141,7 @@ function StreamCard({ stream }: { stream: LiveStream }) {
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <Link
             href={watchUrl}
-            className="truncate text-sm font-semibold leading-tight text-foreground transition-colors group-hover:text-primary-text"
+            className="truncate text-sm leading-tight font-semibold text-foreground transition-colors group-hover:text-primary-text"
             title={stream.stream_title}
           >
             {stream.stream_title}
@@ -169,11 +177,18 @@ function StreamCardSkeleton() {
 
 export default function LiveStreamGrid() {
   const { user } = useAuth()
-  const snapshot = useSyncExternalStore(subscribeLiveStreams, getLiveStreamsSnapshot, getLiveStreamsSnapshot)
+  const snapshot = useSyncExternalStore(
+    subscribeLiveStreams,
+    getLiveStreamsSnapshot,
+    getLiveStreamsSnapshot
+  )
 
   const { streams, error, loaded, refreshing } = snapshot
   const showSkeleton = !loaded && streams.length === 0
-  const totalViewers = streams.reduce((sum, stream) => sum + (stream.viewer_count ?? 0), 0)
+  const totalViewers = streams.reduce(
+    (sum, stream) => sum + (stream.viewer_count ?? 0),
+    0
+  )
   const gridStreams = streams.slice(1)
 
   return (
@@ -185,7 +200,9 @@ export default function LiveStreamGrid() {
       )}
 
       {refreshing && streams.length > 0 ? (
-        <p className="mb-4 text-xs text-muted-foreground">Updating live channels…</p>
+        <p className="mb-4 text-xs text-muted-foreground">
+          Updating live channels…
+        </p>
       ) : null}
 
       {showSkeleton && (
@@ -200,7 +217,9 @@ export default function LiveStreamGrid() {
         <>
           <section>
             <div className="mb-4 flex items-center gap-2">
-              <h2 className="text-lg font-bold tracking-tight text-foreground">Featured</h2>
+              <h2 className="text-lg font-bold tracking-tight text-foreground">
+                Featured
+              </h2>
               <span className="h-1 w-6 rounded-full bg-primary" />
             </div>
             <FeaturedStream stream={streams[0]} />
@@ -209,7 +228,8 @@ export default function LiveStreamGrid() {
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <span className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs text-accent-foreground">
               <span className="size-1.5 animate-pulse rounded-full bg-primary" />
-              {streams.length} live {streams.length === 1 ? 'channel' : 'channels'}
+              {streams.length} live{" "}
+              {streams.length === 1 ? "channel" : "channels"}
             </span>
             <span className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs text-accent-foreground">
               <IconUsers className="size-3.5" />
@@ -220,7 +240,9 @@ export default function LiveStreamGrid() {
           {gridStreams.length > 0 && (
             <section className="mt-8">
               <div className="mb-4 flex items-center gap-2">
-                <h2 className="text-lg font-bold tracking-tight text-foreground">Live channels</h2>
+                <h2 className="text-lg font-bold tracking-tight text-foreground">
+                  Live channels
+                </h2>
                 <span className="h-1 w-6 rounded-full bg-primary" />
               </div>
 
@@ -239,14 +261,20 @@ export default function LiveStreamGrid() {
           <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-primary/10">
             <IconBroadcast className="size-8 text-primary-text" />
           </div>
-          <p className="text-lg font-bold tracking-tight text-foreground">No live streams right now</p>
-          <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-            Be the first to go live. Set up your encoder and start streaming in minutes.
+          <p className="text-lg font-bold tracking-tight text-foreground">
+            No live streams right now
           </p>
-          <Button asChild className="mt-6 bg-primary font-semibold text-primary-foreground hover:bg-primary/90">
+          <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+            Be the first to go live. Set up your encoder and start streaming in
+            minutes.
+          </p>
+          <Button
+            asChild
+            className="mt-6 bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+          >
             <Link href="/broadcast">
               <IconBroadcast className="mr-1.5 size-4" />
-              {user ? 'Go live' : 'Start streaming'}
+              {user ? "Go live" : "Start streaming"}
             </Link>
           </Button>
         </div>

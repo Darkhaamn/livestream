@@ -13,10 +13,17 @@ export function formatRelativeTime(iso: string): string {
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`
 
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
 }
 
-export function formatSessionDuration(session: { started_at: string; ended_at: string | null }): string | null {
+export function formatSessionDuration(session: {
+  started_at: string
+  ended_at: string | null
+}): string | null {
   if (!session.ended_at) return null
   const start = new Date(session.started_at).getTime()
   const end = new Date(session.ended_at).getTime()

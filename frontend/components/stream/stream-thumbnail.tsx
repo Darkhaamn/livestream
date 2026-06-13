@@ -16,7 +16,7 @@ function ThumbnailFallback({ className }: { className?: string }) {
     <div
       className={cn(
         "absolute inset-0 bg-gradient-to-br from-muted via-muted/80 to-background",
-        className,
+        className
       )}
     >
       <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20" />

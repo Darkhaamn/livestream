@@ -11,8 +11,12 @@ export function usernameFromStreamKey(streamKey: string): string | null {
 }
 
 /** Ended sessions that have a linked recording in the database. */
-export function sessionsWithRecordings(sessions: StreamSession[]): StreamSession[] {
-  return sessions.filter(session => session.ended_at && session.recording_path)
+export function sessionsWithRecordings(
+  sessions: StreamSession[]
+): StreamSession[] {
+  return sessions.filter(
+    (session) => session.ended_at && session.recording_path
+  )
 }
 
 /** Build a VOD player object from a stream session row. */
@@ -31,9 +35,12 @@ export function sessionToVod(session: StreamSession): Vod | null {
 }
 
 /** Find the session linked to a VOD id (recording path). */
-export function findSessionForVod(vod: Vod, sessions: StreamSession[]): StreamSession | null {
+export function findSessionForVod(
+  vod: Vod,
+  sessions: StreamSession[]
+): StreamSession | null {
   if (vod.sessionId != null) {
-    return sessions.find(session => session.id === vod.sessionId) ?? null
+    return sessions.find((session) => session.id === vod.sessionId) ?? null
   }
-  return sessions.find(session => session.recording_path === vod.id) ?? null
+  return sessions.find((session) => session.recording_path === vod.id) ?? null
 }

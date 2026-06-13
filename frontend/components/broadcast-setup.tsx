@@ -27,10 +27,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  Field,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldLabel } from "@/components/ui/field"
 import {
   InputGroup,
   InputGroupAddon,
@@ -68,7 +65,11 @@ function CopyField({
     <Field>
       <FieldLabel>{label}</FieldLabel>
       <InputGroup className="h-9 font-mono">
-        <InputGroupInput readOnly type={masked ? "password" : "text"} value={value} />
+        <InputGroupInput
+          readOnly
+          type={masked ? "password" : "text"}
+          value={value}
+        />
         {mask ? (
           <InputGroupAddon align="inline-end">
             <InputGroupButton
@@ -128,7 +129,9 @@ function deriveRtmpServer(rtmpBase: string | undefined) {
 export default function BroadcastSetup() {
   const { user, accessToken, isLoading, refreshUser } = useAuth()
   const [config, setConfig] = useState<BroadcastConfig | null>(null)
-  const [streamKeyOverride, setStreamKeyOverride] = useState<string | null>(null)
+  const [streamKeyOverride, setStreamKeyOverride] = useState<string | null>(
+    null
+  )
   const [fallbackStreamKey, setFallbackStreamKey] = useState("")
   const [isLive, setIsLive] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
@@ -148,7 +151,7 @@ export default function BroadcastSetup() {
       .then((me) => {
         if (active) setFallbackStreamKey(me.stream_key ?? "")
       })
-      .catch(() => { })
+      .catch(() => {})
     return () => {
       active = false
     }
@@ -211,7 +214,9 @@ export default function BroadcastSetup() {
   }
 
   const rtmpServer = deriveRtmpServer(config?.rtmpUrl)
-  const obsStreamKey = streamKey ? `${username}?user=${username}&pass=${streamKey}` : ""
+  const obsStreamKey = streamKey
+    ? `${username}?user=${username}&pass=${streamKey}`
+    : ""
 
   async function handleRegenerate() {
     if (!accessToken) return
@@ -223,7 +228,9 @@ export default function BroadcastSetup() {
       setStreamKeyOverride(null)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to regenerate stream key")
+      setError(
+        err instanceof Error ? err.message : "Failed to regenerate stream key"
+      )
     } finally {
       setRegenerating(false)
     }
@@ -258,7 +265,9 @@ export default function BroadcastSetup() {
                 <p className="mt-1 text-sm text-muted-foreground">
                   Monitor stream health and configure your encoder
                 </p>
-                <p className="mt-2 font-mono text-xs text-muted-foreground">{streamPath}</p>
+                <p className="mt-2 font-mono text-xs text-muted-foreground">
+                  {streamPath}
+                </p>
               </div>
             </div>
 
@@ -271,7 +280,10 @@ export default function BroadcastSetup() {
               </Button>
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/watch/${encodeURIComponent(streamPath)}`}>
-                  <IconExternalLink className="size-4" data-icon="inline-start" />
+                  <IconExternalLink
+                    className="size-4"
+                    data-icon="inline-start"
+                  />
                   Preview
                 </Link>
               </Button>
@@ -307,7 +319,8 @@ export default function BroadcastSetup() {
                 <CardHeader>
                   <CardTitle>Stream info</CardTitle>
                   <CardDescription>
-                    Title, category, and description shown on your channel and live page.
+                    Title, category, and description shown on your channel and
+                    live page.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -347,15 +360,21 @@ export default function BroadcastSetup() {
                   <SetupStep step={2} title="Copy stream key">
                     <CopyField
                       label="Stream key"
-                      value={obsStreamKey || "No stream key — click Regenerate key"}
+                      value={
+                        obsStreamKey || "No stream key — click Regenerate key"
+                      }
                       mask={Boolean(obsStreamKey)}
                     />
                   </SetupStep>
 
                   <SetupStep step={3} title="Start streaming in OBS">
                     <p className="text-sm text-muted-foreground">
-                      Click <strong className="font-medium text-foreground">Start Streaming</strong>{" "}
-                      in OBS. Your dashboard will switch to Live within a few seconds.
+                      Click{" "}
+                      <strong className="font-medium text-foreground">
+                        Start Streaming
+                      </strong>{" "}
+                      in OBS. Your dashboard will switch to Live within a few
+                      seconds.
                     </p>
                   </SetupStep>
                 </CardContent>
@@ -368,16 +387,16 @@ export default function BroadcastSetup() {
                   </CardHeader>
                   <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-foreground">
+                      <p className="text-xs font-medium tracking-wide text-foreground uppercase">
                         Stream path
                       </p>
                       <p className="mt-1 font-mono text-xs">{streamPath}</p>
                     </div>
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-foreground">
+                      <p className="text-xs font-medium tracking-wide text-foreground uppercase">
                         Full ingest URL
                       </p>
-                      <p className="mt-1 break-all font-mono text-xs">
+                      <p className="mt-1 font-mono text-xs break-all">
                         {rtmpServer}/{username}?user=…&pass=…
                       </p>
                     </div>
@@ -388,7 +407,8 @@ export default function BroadcastSetup() {
                   <CardContent className="pt-6">
                     <p className="text-sm font-medium text-foreground">Tip</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Keep your stream key private. Regenerate it if you think it was exposed.
+                      Keep your stream key private. Regenerate it if you think
+                      it was exposed.
                     </p>
                   </CardContent>
                 </Card>

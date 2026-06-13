@@ -1,13 +1,13 @@
-const CHAT_BASE = process.env.NEXT_PUBLIC_CHAT_URL ?? 'ws://localhost:8082'
+const CHAT_BASE = process.env.NEXT_PUBLIC_CHAT_URL ?? "ws://localhost:8082"
 
 export type ChatMessageType =
-  | 'chat'
-  | 'system'
-  | 'join'
-  | 'leave'
-  | 'error'
-  | 'clear'
-  | 'delete'
+  | "chat"
+  | "system"
+  | "join"
+  | "leave"
+  | "error"
+  | "clear"
+  | "delete"
 
 export interface ChatMessage {
   type: ChatMessageType
@@ -38,7 +38,7 @@ export class ChatSocket {
 
   connect(onOpen?: () => void, onClose?: () => void) {
     const url = new URL(`${CHAT_BASE}/ws/${this.room}`)
-    if (this.token) url.searchParams.set('token', this.token)
+    if (this.token) url.searchParams.set("token", this.token)
     this.ws = new WebSocket(url.toString())
 
     this.ws.onopen = () => {
@@ -48,13 +48,16 @@ export class ChatSocket {
     this.ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data as string) as ChatMessage
-        this.listeners.forEach(l => l(msg))
+        this.listeners.forEach((l) => l(msg))
       } catch {}
     }
 
     this.ws.onclose = () => {
       onClose?.()
-      this.reconnectTimer = setTimeout(() => this.connect(onOpen, onClose), 3000)
+      this.reconnectTimer = setTimeout(
+        () => this.connect(onOpen, onClose),
+        3000
+      )
     }
 
     this.ws.onerror = () => this.ws?.close()

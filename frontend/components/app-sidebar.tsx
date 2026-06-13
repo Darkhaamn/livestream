@@ -24,7 +24,12 @@ const POLL_MS = 30_000
 const COLLAPSED_COUNT = 10
 
 const NAV_ITEMS = [
-  { label: "Home", href: "/", icon: IconHome, match: (path: string) => path === "/" },
+  {
+    label: "Home",
+    href: "/",
+    icon: IconHome,
+    match: (path: string) => path === "/",
+  },
   { label: "Browse", href: "/", icon: IconCompass, match: () => false },
   { label: "Following", href: "/", icon: IconHeart, match: () => false },
 ]
@@ -38,7 +43,10 @@ type SidebarStreamer = {
   viewer_count: number
 }
 
-function toSidebarStreamer(channel: FollowingChannel, isLive: boolean): SidebarStreamer {
+function toSidebarStreamer(
+  channel: FollowingChannel,
+  isLive: boolean
+): SidebarStreamer {
   return {
     username: channel.username,
     display_name: channel.display_name,
@@ -50,7 +58,7 @@ function toSidebarStreamer(channel: FollowingChannel, isLive: boolean): SidebarS
 }
 
 function liveStreamToSidebarStreamer(
-  stream: ReturnType<typeof getLiveStreamsSnapshot>["streams"][number],
+  stream: ReturnType<typeof getLiveStreamsSnapshot>["streams"][number]
 ): SidebarStreamer {
   return {
     username: stream.username,
@@ -71,7 +79,7 @@ function SidebarStreamerRow({ streamer }: { streamer: SidebarStreamer }) {
       href={href}
       className={cn(
         "group flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-accent",
-        !streamer.is_live && "opacity-55 hover:opacity-80",
+        !streamer.is_live && "opacity-55 hover:opacity-80"
       )}
     >
       <ChannelAvatar
@@ -87,12 +95,16 @@ function SidebarStreamerRow({ streamer }: { streamer: SidebarStreamer }) {
         <p
           className={cn(
             "truncate text-sm leading-tight",
-            streamer.is_live ? "font-semibold text-foreground" : "font-medium text-muted-foreground",
+            streamer.is_live
+              ? "font-semibold text-foreground"
+              : "font-medium text-muted-foreground"
           )}
         >
           {name}
         </p>
-        <p className="truncate text-xs text-muted-foreground">{streamer.stream_category}</p>
+        <p className="truncate text-xs text-muted-foreground">
+          {streamer.stream_category}
+        </p>
       </div>
 
       {streamer.is_live ? (
@@ -101,7 +113,10 @@ function SidebarStreamerRow({ streamer }: { streamer: SidebarStreamer }) {
           <span>{formatViewerCount(streamer.viewer_count)}</span>
         </div>
       ) : (
-        <IconEyeOff className="size-4 shrink-0 text-muted-foreground/70" aria-label="Offline" />
+        <IconEyeOff
+          className="size-4 shrink-0 text-muted-foreground/70"
+          aria-label="Offline"
+        />
       )}
     </Link>
   )
@@ -123,25 +138,27 @@ function StreamerSection({
   if (streamers.length === 0) {
     return emptyMessage ? (
       <div className="px-2 py-1">
-        <p className="text-xs leading-relaxed text-muted-foreground">{emptyMessage}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {emptyMessage}
+        </p>
       </div>
     ) : null
   }
 
   return (
     <section className="mt-4">
-      <h3 className="mb-1 px-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+      <h3 className="mb-1 px-2 text-xs font-bold tracking-wider text-muted-foreground uppercase">
         {title}
       </h3>
       <div className="space-y-0.5">
-        {visible.map(streamer => (
+        {visible.map((streamer) => (
           <SidebarStreamerRow key={streamer.username} streamer={streamer} />
         ))}
       </div>
       {hasMore ? (
         <button
           type="button"
-          onClick={() => setExpanded(v => !v)}
+          onClick={() => setExpanded((v) => !v)}
           className="mt-1 px-2 text-xs font-semibold text-primary-text hover:underline"
         >
           {expanded ? "Show Less" : "Show More"}
@@ -158,7 +175,7 @@ export function AppSidebar() {
   const liveSnapshot = useSyncExternalStore(
     subscribeLiveStreams,
     getLiveStreamsSnapshot,
-    getLiveStreamsSnapshot,
+    getLiveStreamsSnapshot
   )
 
   useEffect(() => {
@@ -187,12 +204,12 @@ export function AppSidebar() {
 
   const followingStreamers = useMemo(() => {
     const live = following
-      .filter(ch => ch.is_live)
+      .filter((ch) => ch.is_live)
       .sort((a, b) => b.viewer_count - a.viewer_count)
-      .map(ch => toSidebarStreamer(ch, true))
+      .map((ch) => toSidebarStreamer(ch, true))
     const offline = following
-      .filter(ch => !ch.is_live)
-      .map(ch => toSidebarStreamer(ch, false))
+      .filter((ch) => !ch.is_live)
+      .map((ch) => toSidebarStreamer(ch, false))
     return [...live, ...offline]
   }, [following])
 
@@ -201,14 +218,15 @@ export function AppSidebar() {
     return liveSnapshot.streams
       .filter(
         (stream) =>
-          stream.username !== user?.username && !followingUsernames.has(stream.username),
+          stream.username !== user?.username &&
+          !followingUsernames.has(stream.username)
       )
       .sort((a, b) => b.viewer_count - a.viewer_count)
       .map(liveStreamToSidebarStreamer)
   }, [liveSnapshot.streams, following, user?.username])
 
   return (
-    <aside className="fixed bottom-0 top-14 z-20 hidden w-[260px] flex-col border-r border-border bg-sidebar lg:flex">
+    <aside className="fixed top-14 bottom-0 z-20 hidden w-[260px] flex-col border-r border-border bg-sidebar lg:flex">
       <div className="flex flex-1 flex-col overflow-y-auto py-3">
         <nav className="space-y-0.5 px-2">
           {NAV_ITEMS.map(({ label, href, icon: Icon, match }) => {
@@ -221,7 +239,7 @@ export function AppSidebar() {
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
                   isActive
                     ? "bg-accent text-primary-text"
-                    : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                    : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
                 )}
               >
                 <Icon className="size-5 shrink-0" />

@@ -18,7 +18,7 @@ export const INBOUND_LAG_RISK_MBPS = 0.3
 
 export function getStreamHealth(
   stream: PathSummary | null,
-  options?: { inboundMbps?: number },
+  options?: { inboundMbps?: number }
 ): StreamHealth {
   if (!stream?.online) {
     return {

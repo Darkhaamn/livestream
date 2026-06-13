@@ -34,7 +34,7 @@ export function ChannelAvatar({
           "relative block shrink-0 overflow-hidden rounded-full bg-muted",
           sizeClasses[size],
           ring,
-          className,
+          className
         )}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -49,7 +49,7 @@ export function ChannelAvatar({
         "flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-muted to-card font-bold text-primary-text",
         sizeClasses[size],
         ring,
-        className,
+        className
       )}
     >
       {initial}

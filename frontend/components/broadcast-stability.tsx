@@ -23,7 +23,10 @@ type BroadcastStabilityProps = {
   isLive?: boolean
 }
 
-export default function BroadcastStability({ streamKey, isLive: isLiveProp }: BroadcastStabilityProps) {
+export default function BroadcastStability({
+  streamKey,
+  isLive: isLiveProp,
+}: BroadcastStabilityProps) {
   const { accessToken } = useAuth()
   const [polledLive, setPolledLive] = useState(false)
   const [polledLoading, setPolledLoading] = useState(isLiveProp === undefined)
@@ -94,12 +97,16 @@ export default function BroadcastStability({ streamKey, isLive: isLiveProp }: Br
             <div>
               <CardTitle>Stream stability</CardTitle>
               <CardDescription className="mt-1">
-                Bandwidth and viewers over time — steady lines mean a stable broadcast.
+                Bandwidth and viewers over time — steady lines mean a stable
+                broadcast.
               </CardDescription>
             </div>
           </div>
           {isLive ? (
-            <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary-text">
+            <Badge
+              variant="outline"
+              className="border-primary/30 bg-primary/10 text-primary-text"
+            >
               Recording metrics
             </Badge>
           ) : null}
@@ -109,7 +116,11 @@ export default function BroadcastStability({ streamKey, isLive: isLiveProp }: Br
         {loading ? (
           <Skeleton className="h-[280px] w-full rounded-lg md:h-[320px]" />
         ) : (
-          <StreamMetricsChart samples={metricSamples} isLive={isLive} size="large" />
+          <StreamMetricsChart
+            samples={metricSamples}
+            isLive={isLive}
+            size="large"
+          />
         )}
       </CardContent>
     </Card>

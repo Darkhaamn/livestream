@@ -72,7 +72,8 @@ function StreamInfoEditorForm({
     <FieldGroup className={className}>
       {!compact ? (
         <FieldDescription>
-          Shown to viewers on your channel and browse pages. Updates apply immediately while live.
+          Shown to viewers on your channel and browse pages. Updates apply
+          immediately while live.
         </FieldDescription>
       ) : null}
 
@@ -119,7 +120,9 @@ function StreamInfoEditorForm({
       </Field>
 
       <Button type="button" onClick={() => void handleSave()} disabled={saving}>
-        {saving ? "Saving…" : saved ? (
+        {saving ? (
+          "Saving…"
+        ) : saved ? (
           <>
             <IconCheck data-icon="inline-start" />
             Saved
@@ -132,7 +135,11 @@ function StreamInfoEditorForm({
   )
 }
 
-export function StreamInfoEditor({ className, compact = false, onSaved }: StreamInfoEditorProps) {
+export function StreamInfoEditor({
+  className,
+  compact = false,
+  onSaved,
+}: StreamInfoEditorProps) {
   const { user, accessToken, refreshUser } = useAuth()
 
   if (!user || !accessToken) return null

@@ -83,7 +83,7 @@ export function VodPlayer({
     <div
       className={cn(
         "vod-player relative aspect-video w-full overflow-hidden bg-black",
-        className,
+        className
       )}
       data-player-shell
     >

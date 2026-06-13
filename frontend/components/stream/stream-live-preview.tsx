@@ -11,7 +11,10 @@ type StreamLivePreviewProps = {
   className?: string
 }
 
-export function StreamLivePreview({ streamKey, className }: StreamLivePreviewProps) {
+export function StreamLivePreview({
+  streamKey,
+  className,
+}: StreamLivePreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [active, setActive] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -22,7 +25,7 @@ export function StreamLivePreview({ streamKey, className }: StreamLivePreviewPro
 
     const observer = new IntersectionObserver(
       ([entry]) => setActive(entry?.isIntersecting ?? false),
-      { rootMargin: "100px" },
+      { rootMargin: "100px" }
     )
     observer.observe(node)
     return () => observer.disconnect()

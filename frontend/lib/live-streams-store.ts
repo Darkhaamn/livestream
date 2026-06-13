@@ -1,4 +1,4 @@
-import { api, type LiveStream } from '@/lib/api'
+import { api, type LiveStream } from "@/lib/api"
 
 const POLL_MS = 15_000
 
@@ -61,7 +61,7 @@ async function fetchLiveStreams() {
   } catch (err) {
     snapshot = {
       ...snapshot,
-      error: err instanceof Error ? err.message : 'Failed to load streams',
+      error: err instanceof Error ? err.message : "Failed to load streams",
       loaded: snapshot.loaded || snapshot.streams.length > 0,
       refreshing: false,
     }
@@ -79,7 +79,7 @@ function startPolling() {
   if (pollTimer) return
   void fetchLiveStreams()
   pollTimer = window.setInterval(() => void fetchLiveStreams(), POLL_MS)
-  document.addEventListener('visibilitychange', onVisibilityChange)
+  document.addEventListener("visibilitychange", onVisibilityChange)
 }
 
 function stopPolling() {
@@ -87,7 +87,7 @@ function stopPolling() {
     window.clearInterval(pollTimer)
     pollTimer = null
   }
-  document.removeEventListener('visibilitychange', onVisibilityChange)
+  document.removeEventListener("visibilitychange", onVisibilityChange)
 }
 
 export function getLiveStreamsSnapshot(): LiveStreamsSnapshot {

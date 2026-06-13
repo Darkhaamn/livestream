@@ -1,8 +1,11 @@
-import type { StreamMetricsResponse } from '@/lib/stream-metrics'
+import type { StreamMetricsResponse } from "@/lib/stream-metrics"
 
-export type { StreamMetricsResponse, StreamMetricSample } from '@/lib/stream-metrics'
+export type {
+  StreamMetricsResponse,
+  StreamMetricSample,
+} from "@/lib/stream-metrics"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8081'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8081"
 
 export interface TokenPair {
   access_token: string
@@ -66,7 +69,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...init.headers,
     },
   })
@@ -84,70 +87,98 @@ function authHeader(token: string) {
 export const api = {
   auth: {
     register: (username: string, email: string, password: string) =>
-      request<TokenPair>('/api/v1/auth/register', {
-        method: 'POST',
+      request<TokenPair>("/api/v1/auth/register", {
+        method: "POST",
         body: JSON.stringify({ username, email, password }),
       }),
     login: (email: string, password: string) =>
-      request<TokenPair>('/api/v1/auth/login', {
-        method: 'POST',
+      request<TokenPair>("/api/v1/auth/login", {
+        method: "POST",
         body: JSON.stringify({ email, password }),
       }),
     refresh: (refreshToken: string) =>
-      request<TokenPair>('/api/v1/auth/refresh', {
-        method: 'POST',
+      request<TokenPair>("/api/v1/auth/refresh", {
+        method: "POST",
         body: JSON.stringify({ refresh_token: refreshToken }),
       }),
     logout: (refreshToken: string) =>
-      request('/api/v1/auth/logout', {
-        method: 'POST',
+      request("/api/v1/auth/logout", {
+        method: "POST",
         body: JSON.stringify({ refresh_token: refreshToken }),
       }),
   },
   users: {
     me: (token: string) =>
-      request<User>('/api/v1/users/me', { headers: authHeader(token) }),
+      request<User>("/api/v1/users/me", { headers: authHeader(token) }),
     myFollowing: (token: string) =>
-      request<FollowingChannel[]>('/api/v1/users/me/following', { headers: authHeader(token) }),
+      request<FollowingChannel[]>("/api/v1/users/me/following", {
+        headers: authHeader(token),
+      }),
     getByUsername: (username: string) =>
       request<User>(`/api/v1/users/${username}`),
     sessions: (username: string) =>
       request<StreamSession[]>(`/api/v1/users/${username}/sessions`),
-    updateMe: (token: string, data: Partial<Pick<User, 'display_name' | 'bio' | 'stream_title' | 'stream_category' | 'stream_description'>>) =>
-      request<User>('/api/v1/users/me', {
-        method: 'PUT',
+    updateMe: (
+      token: string,
+      data: Partial<
+        Pick<
+          User,
+          | "display_name"
+          | "bio"
+          | "stream_title"
+          | "stream_category"
+          | "stream_description"
+        >
+      >
+    ) =>
+      request<User>("/api/v1/users/me", {
+        method: "PUT",
         headers: authHeader(token),
         body: JSON.stringify(data),
       }),
     regenerateStreamKey: (token: string) =>
-      request<{ stream_key: string }>('/api/v1/users/me/stream-key', {
-        method: 'POST',
+      request<{ stream_key: string }>("/api/v1/users/me/stream-key", {
+        method: "POST",
         headers: authHeader(token),
       }),
     streamMetrics: (token: string, sessionId?: number) => {
-      const query = sessionId ? `?session_id=${sessionId}` : ''
-      return request<StreamMetricsResponse>(`/api/v1/users/me/stream-metrics${query}`, {
-        headers: authHeader(token),
-      })
+      const query = sessionId ? `?session_id=${sessionId}` : ""
+      return request<StreamMetricsResponse>(
+        `/api/v1/users/me/stream-metrics${query}`,
+        {
+          headers: authHeader(token),
+        }
+      )
     },
     followStatus: (token: string, username: string) =>
-      request<{ following: boolean }>(`/api/v1/users/${username}/follow-status`, {
-        headers: authHeader(token),
-      }),
+      request<{ following: boolean }>(
+        `/api/v1/users/${username}/follow-status`,
+        {
+          headers: authHeader(token),
+        }
+      ),
     follow: (token: string, username: string) =>
-      request<{ following: boolean; follower_count: number }>(`/api/v1/users/${username}/follow`, {
-        method: 'POST',
-        headers: authHeader(token),
-      }),
+      request<{ following: boolean; follower_count: number }>(
+        `/api/v1/users/${username}/follow`,
+        {
+          method: "POST",
+          headers: authHeader(token),
+        }
+      ),
     unfollow: (token: string, username: string) =>
-      request<{ following: boolean; follower_count: number }>(`/api/v1/users/${username}/follow`, {
-        method: 'DELETE',
-        headers: authHeader(token),
-      }),
+      request<{ following: boolean; follower_count: number }>(
+        `/api/v1/users/${username}/follow`,
+        {
+          method: "DELETE",
+          headers: authHeader(token),
+        }
+      ),
   },
   streams: {
-    live: () => request<LiveStream[]>('/api/v1/streams/live'),
+    live: () => request<LiveStream[]>("/api/v1/streams/live"),
     following: (token: string) =>
-      request<LiveStream[]>('/api/v1/streams/following', { headers: authHeader(token) }),
+      request<LiveStream[]>("/api/v1/streams/following", {
+        headers: authHeader(token),
+      }),
   },
 }

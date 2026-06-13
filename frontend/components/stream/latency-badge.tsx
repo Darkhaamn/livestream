@@ -43,7 +43,7 @@ export function LatencyBadge({ latencyMs, className }: LatencyBadgeProps) {
       className={cn(
         "gap-1 border font-medium backdrop-blur-sm",
         levelStyles[level],
-        className,
+        className
       )}
     >
       {shortLabel}

@@ -22,7 +22,11 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { getPath } from "@/lib/mtx-api"
 import type { PathSummary } from "@/lib/mtx-types"
-import { formatViewerCount, getStreamHealth, getStreamResolution } from "@/lib/stream-health"
+import {
+  formatViewerCount,
+  getStreamHealth,
+  getStreamResolution,
+} from "@/lib/stream-health"
 import { rollingMean } from "@/lib/stream-metrics"
 import { formatBytes, formatMbps } from "@/lib/stream"
 import { cn } from "@/lib/utils"
@@ -52,7 +56,7 @@ function StatCard({
         "rounded-xl border p-4",
         tone === "primary" && "border-primary/20 bg-primary/[0.06]",
         tone === "warning" && "border-amber-500/20 bg-amber-500/[0.06]",
-        tone === "default" && "border-border bg-muted/30",
+        tone === "default" && "border-border bg-muted/30"
       )}
     >
       <div className="mb-3 flex items-center gap-2">
@@ -60,23 +64,28 @@ function StatCard({
           className={cn(
             "flex size-8 items-center justify-center rounded-lg",
             tone === "primary" && "bg-primary/15 text-primary-text",
-            tone === "warning" && "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-            tone === "default" && "bg-background text-muted-foreground",
+            tone === "warning" &&
+              "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+            tone === "default" && "bg-background text-muted-foreground"
           )}
         >
           <Icon className="size-4" />
         </div>
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {label}
         </span>
       </div>
-      <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">{value}</p>
+      <p className="text-xl font-bold tracking-tight text-foreground tabular-nums">
+        {value}
+      </p>
       {sub ? <p className="mt-1 text-xs text-muted-foreground">{sub}</p> : null}
     </div>
   )
 }
 
-export default function BroadcastLiveStats({ streamKey }: BroadcastLiveStatsProps) {
+export default function BroadcastLiveStats({
+  streamKey,
+}: BroadcastLiveStatsProps) {
   const [stream, setStream] = useState<PathSummary | null>(null)
   const [inboundHistory, setInboundHistory] = useState<number[]>([])
   const [outboundHistory, setOutboundHistory] = useState<number[]>([])
@@ -92,10 +101,10 @@ export default function BroadcastLiveStats({ streamKey }: BroadcastLiveStatsProp
         setStream(data)
         if (data.online) {
           setInboundHistory((prev) =>
-            [...prev, data.bandwidth.inboundMbps].slice(-INBOUND_SMOOTH_WINDOW),
+            [...prev, data.bandwidth.inboundMbps].slice(-INBOUND_SMOOTH_WINDOW)
           )
           setOutboundHistory((prev) =>
-            [...prev, data.bandwidth.outboundMbps].slice(-INBOUND_SMOOTH_WINDOW),
+            [...prev, data.bandwidth.outboundMbps].slice(-INBOUND_SMOOTH_WINDOW)
           )
         } else {
           setInboundHistory([])
@@ -138,7 +147,9 @@ export default function BroadcastLiveStats({ streamKey }: BroadcastLiveStatsProp
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
         <div>
           <CardTitle>Live stats</CardTitle>
-          <CardDescription className="mt-1">Real-time encoder and viewer metrics</CardDescription>
+          <CardDescription className="mt-1">
+            Real-time encoder and viewer metrics
+          </CardDescription>
         </div>
         <div className="flex items-center gap-2">
           {isLive ? (
@@ -167,27 +178,38 @@ export default function BroadcastLiveStats({ streamKey }: BroadcastLiveStatsProp
             <div
               className={cn(
                 "rounded-xl border px-4 py-3",
-                health.status === "healthy" && "border-primary/20 bg-primary/[0.06]",
-                health.status === "critical" && "border-destructive/30 bg-destructive/10",
-                health.status === "warning" && "border-amber-500/20 bg-amber-500/[0.06]",
-                health.status === "offline" && "border-border bg-muted/30",
+                health.status === "healthy" &&
+                  "border-primary/20 bg-primary/[0.06]",
+                health.status === "critical" &&
+                  "border-destructive/30 bg-destructive/10",
+                health.status === "warning" &&
+                  "border-amber-500/20 bg-amber-500/[0.06]",
+                health.status === "offline" && "border-border bg-muted/30"
               )}
             >
-              <p className="text-sm font-semibold text-foreground">{health.label}</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">{health.description}</p>
+              <p className="text-sm font-semibold text-foreground">
+                {health.label}
+              </p>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {health.description}
+              </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <StatCard
                 label="Inbound"
-                value={formatMbps(smoothedInbound || stream?.bandwidth.inboundMbps || 0)}
+                value={formatMbps(
+                  smoothedInbound || stream?.bandwidth.inboundMbps || 0
+                )}
                 sub={`~${INBOUND_SMOOTH_WINDOW * 2}s avg`}
                 icon={IconArrowUp}
                 tone={healthTone}
               />
               <StatCard
                 label="Outbound"
-                value={formatMbps(smoothedOutbound || stream?.bandwidth.outboundMbps || 0)}
+                value={formatMbps(
+                  smoothedOutbound || stream?.bandwidth.outboundMbps || 0
+                )}
                 sub={formatBytes(stream?.bandwidth.outboundBytes ?? 0)}
                 icon={IconRefresh}
               />
@@ -230,7 +252,10 @@ export default function BroadcastLiveStats({ streamKey }: BroadcastLiveStatsProp
                 </div>
                 <Button asChild className="w-full">
                   <Link href={`/watch/${encodeURIComponent(streamKey)}`}>
-                    <IconExternalLink className="size-4" data-icon="inline-start" />
+                    <IconExternalLink
+                      className="size-4"
+                      data-icon="inline-start"
+                    />
                     Open viewer page
                   </Link>
                 </Button>

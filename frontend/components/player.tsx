@@ -119,10 +119,14 @@ export default function LivePlyrPlayer({
         data-player-shell
         className={cn(
           "relative aspect-video w-full overflow-hidden bg-black",
-          className ?? "rounded-lg ring-1 ring-white/10",
+          className ?? "rounded-lg ring-1 ring-white/10"
         )}
       >
-        <video ref={videoRef} playsInline className="h-full w-full object-contain" />
+        <video
+          ref={videoRef}
+          playsInline
+          className="h-full w-full object-contain"
+        />
         {ready && !error ? (
           <PlayerOverlay
             videoRef={videoRef}

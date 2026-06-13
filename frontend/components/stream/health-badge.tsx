@@ -1,8 +1,5 @@
 import { Badge } from "@/components/ui/badge"
-import {
-  getStreamHealth,
-  type StreamHealthStatus,
-} from "@/lib/stream-health"
+import { getStreamHealth, type StreamHealthStatus } from "@/lib/stream-health"
 import type { PathSummary } from "@/lib/mtx-types"
 import { cn } from "@/lib/utils"
 
@@ -21,7 +18,12 @@ type HealthBadgeProps = {
   inboundMbps?: number
 }
 
-export function HealthBadge({ stream, className, showDot = true, inboundMbps }: HealthBadgeProps) {
+export function HealthBadge({
+  stream,
+  className,
+  showDot = true,
+  inboundMbps,
+}: HealthBadgeProps) {
   const health = getStreamHealth(stream, { inboundMbps })
 
   return (
@@ -30,7 +32,7 @@ export function HealthBadge({ stream, className, showDot = true, inboundMbps }: 
       className={cn(
         "gap-1.5 border font-medium",
         statusStyles[health.status],
-        className,
+        className
       )}
     >
       {showDot ? (
@@ -40,7 +42,7 @@ export function HealthBadge({ stream, className, showDot = true, inboundMbps }: 
             health.status === "healthy" && "bg-emerald-400",
             health.status === "warning" && "bg-amber-400",
             health.status === "critical" && "bg-red-500",
-            health.status === "offline" && "bg-zinc-500",
+            health.status === "offline" && "bg-zinc-500"
           )}
         />
       ) : null}

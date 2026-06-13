@@ -30,7 +30,7 @@ export function VodThumbnail({
       <div
         className={cn(
           "absolute inset-0 bg-gradient-to-br from-muted via-muted/80 to-background",
-          className,
+          className
         )}
       >
         <div className="absolute inset-0 flex items-center justify-center opacity-40">

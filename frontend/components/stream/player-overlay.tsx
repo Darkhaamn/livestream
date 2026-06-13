@@ -124,8 +124,8 @@ export function PlayerOverlay({
       {/* Bottom controls — show on hover */}
       <div
         className={cn(
-          "absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent px-3 pb-3 pt-10 transition-opacity duration-200",
-          showControls || !playing || muted ? "opacity-100" : "opacity-0",
+          "absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent px-3 pt-10 pb-3 transition-opacity duration-200",
+          showControls || !playing || muted ? "opacity-100" : "opacity-0"
         )}
       >
         <div className="flex items-center gap-1">

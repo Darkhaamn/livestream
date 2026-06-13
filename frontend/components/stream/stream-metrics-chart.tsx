@@ -67,7 +67,9 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-function stabilityBadgeVariant(level: ReturnType<typeof computeStreamStability>["level"]) {
+function stabilityBadgeVariant(
+  level: ReturnType<typeof computeStreamStability>["level"]
+) {
   switch (level) {
     case "stable":
       return "default" as const
@@ -119,7 +121,8 @@ function MetricsTooltip({
         />
         {point.frameErrors > 0 ? (
           <p className="text-destructive">
-            {point.frameErrors} frame error{point.frameErrors === 1 ? "" : "s"} — encoder may be lagging
+            {point.frameErrors} frame error{point.frameErrors === 1 ? "" : "s"}{" "}
+            — encoder may be lagging
           </p>
         ) : null}
       </div>
@@ -146,12 +149,19 @@ function TooltipRow({
     <div className="flex flex-col gap-0.5">
       <div className="flex items-center justify-between gap-3">
         <span className="flex items-center gap-2 text-muted-foreground">
-          <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+          <span
+            className="size-2 shrink-0 rounded-full"
+            style={{ backgroundColor: color }}
+          />
           {label}
         </span>
         <div className="text-right">
-          <span className="font-mono font-medium tabular-nums text-foreground">{value}</span>
-          {subValue ? <p className="text-[10px] text-muted-foreground">{subValue}</p> : null}
+          <span className="font-mono font-medium text-foreground tabular-nums">
+            {value}
+          </span>
+          {subValue ? (
+            <p className="text-[10px] text-muted-foreground">{subValue}</p>
+          ) : null}
         </div>
       </div>
       {hint ? (
@@ -160,7 +170,7 @@ function TooltipRow({
             "pl-4 text-[11px]",
             hintTone === "critical" && "text-destructive",
             hintTone === "degraded" && "text-amber-600 dark:text-amber-400",
-            hintTone === "healthy" && "text-muted-foreground",
+            hintTone === "healthy" && "text-muted-foreground"
           )}
         >
           {hint}
@@ -188,13 +198,23 @@ export function StreamMetricsChart({
         className={cn(
           "flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 px-6 text-center",
           isLarge ? "min-h-[280px] py-16 md:min-h-[320px]" : "py-10",
-          className,
+          className
         )}
       >
-        <p className={cn("font-medium text-foreground", isLarge ? "text-base" : "text-sm")}>
+        <p
+          className={cn(
+            "font-medium text-foreground",
+            isLarge ? "text-base" : "text-sm"
+          )}
+        >
           No live data yet
         </p>
-        <p className={cn("mt-2 max-w-md text-muted-foreground", isLarge ? "text-sm" : "text-xs")}>
+        <p
+          className={cn(
+            "mt-2 max-w-md text-muted-foreground",
+            isLarge ? "text-sm" : "text-xs"
+          )}
+        >
           Go live in OBS to track bandwidth and viewer stability here.
         </p>
       </div>
@@ -207,13 +227,21 @@ export function StreamMetricsChart({
         className={cn(
           "flex flex-col items-center justify-center gap-3 rounded-lg border border-border bg-muted/30 px-6 text-center",
           isLarge ? "min-h-[280px] py-16 md:min-h-[320px]" : "py-8",
-          className,
+          className
         )}
       >
-        <Badge variant={stabilityBadgeVariant(stability.level)} className={isLarge ? "text-sm" : undefined}>
+        <Badge
+          variant={stabilityBadgeVariant(stability.level)}
+          className={isLarge ? "text-sm" : undefined}
+        >
           {stability.label}
         </Badge>
-        <p className={cn("text-muted-foreground", isLarge ? "text-sm" : "text-xs")}>
+        <p
+          className={cn(
+            "text-muted-foreground",
+            isLarge ? "text-sm" : "text-xs"
+          )}
+        >
           {stability.description}
         </p>
       </div>
@@ -229,7 +257,10 @@ export function StreamMetricsChart({
     <div className={cn("flex flex-col gap-5", className)}>
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={stabilityBadgeVariant(stability.level)} className={isLarge ? "text-sm" : undefined}>
+          <Badge
+            variant={stabilityBadgeVariant(stability.level)}
+            className={isLarge ? "text-sm" : undefined}
+          >
             {stability.label}
           </Badge>
           <Badge
@@ -244,15 +275,24 @@ export function StreamMetricsChart({
             {latestInboundStatus.label}
           </Badge>
         </div>
-        <p className={cn("text-muted-foreground", isLarge ? "text-sm" : "text-xs")}>
-          {stability.description}. Status uses {rollingLabel} average — not a single spike. Dashed lines:
-          recommended ({INBOUND_RECOMMENDED_MBPS} Mbps) and lag-risk ({INBOUND_LAG_RISK_MBPS} Mbps).
+        <p
+          className={cn(
+            "text-muted-foreground",
+            isLarge ? "text-sm" : "text-xs"
+          )}
+        >
+          {stability.description}. Status uses {rollingLabel} average — not a
+          single spike. Dashed lines: recommended ({INBOUND_RECOMMENDED_MBPS}{" "}
+          Mbps) and lag-risk ({INBOUND_LAG_RISK_MBPS} Mbps).
         </p>
       </div>
 
       <ChartContainer
         config={chartConfig}
-        className={cn("aspect-auto w-full", isLarge ? "h-[280px] md:h-[320px]" : "h-[200px]")}
+        className={cn(
+          "aspect-auto w-full",
+          isLarge ? "h-[280px] md:h-[320px]" : "h-[200px]"
+        )}
         initialDimension={{ width: 640, height: chartHeight }}
       >
         <LineChart
@@ -275,7 +315,7 @@ export function StreamMetricsChart({
             tickMargin={8}
             width={isLarge ? 44 : 36}
             tick={{ fontSize: isLarge ? 12 : 10 }}
-            tickFormatter={value => `${value}`}
+            tickFormatter={(value) => `${value}`}
             label={{
               value: "Mbps",
               angle: -90,
@@ -365,17 +405,21 @@ export function StreamMetricsChart({
       <div
         className={cn(
           "flex flex-wrap gap-x-6 gap-y-2 text-muted-foreground",
-          isLarge ? "text-sm" : "text-xs",
+          isLarge ? "text-sm" : "text-xs"
         )}
       >
         <span>
           Inbound{" "}
-          <span className="font-mono font-medium text-foreground">{formatMbps(avgInbound)}</span>
+          <span className="font-mono font-medium text-foreground">
+            {formatMbps(avgInbound)}
+          </span>
           <span className="text-muted-foreground/80"> avg</span>
         </span>
         <span>
           Outbound{" "}
-          <span className="font-mono font-medium text-foreground">{formatMbps(avgOutbound)}</span>
+          <span className="font-mono font-medium text-foreground">
+            {formatMbps(avgOutbound)}
+          </span>
           <span className="text-muted-foreground/80"> avg</span>
         </span>
         <span>

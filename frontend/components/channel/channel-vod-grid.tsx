@@ -32,8 +32,10 @@ export function ChannelVodGrid({
   emptyMessage = "No recordings yet",
 }: ChannelVodGridProps) {
   const recordings = sessionsWithRecordings(sessions)
-    .map(session => ({ session, vod: sessionToVod(session) }))
-    .filter((item): item is { session: StreamSession; vod: Vod } => item.vod != null)
+    .map((session) => ({ session, vod: sessionToVod(session) }))
+    .filter(
+      (item): item is { session: StreamSession; vod: Vod } => item.vod != null
+    )
 
   const visible = limit != null ? recordings.slice(0, limit) : recordings
   const displayName = channel.display_name ?? channel.username
@@ -49,7 +51,9 @@ export function ChannelVodGrid({
   return (
     <section>
       <div className="mb-6 flex items-center justify-between gap-4">
-        <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">{title}</h2>
+        <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
+          {title}
+        </h2>
         {showViewAll && recordings.length > (limit ?? 0) ? (
           <button
             type="button"
@@ -73,7 +77,9 @@ export function ChannelVodGrid({
               onClick={() => onSelect(vod)}
               className={cn(
                 "group overflow-hidden rounded-xl border border-border bg-card text-left transition-all",
-                isActive ? "ring-2 ring-primary" : "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
+                isActive
+                  ? "ring-2 ring-primary"
+                  : "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
               )}
             >
               <div className="relative aspect-video overflow-hidden bg-black">
@@ -89,7 +95,7 @@ export function ChannelVodGrid({
                 )}
                 <VodPlayOverlay />
                 {duration ? (
-                  <span className="absolute left-2 top-2 rounded bg-black/75 px-1.5 py-0.5 text-[11px] font-bold text-white">
+                  <span className="absolute top-2 left-2 rounded bg-black/75 px-1.5 py-0.5 text-[11px] font-bold text-white">
                     {duration}
                   </span>
                 ) : null}
@@ -103,7 +109,7 @@ export function ChannelVodGrid({
                   size="sm"
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-sm font-semibold leading-snug text-foreground">
+                  <p className="line-clamp-2 text-sm leading-snug font-semibold text-foreground">
                     {session.title}
                   </p>
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">

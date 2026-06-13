@@ -20,7 +20,8 @@ export async function POST(request: Request) {
 
   const forwardHeaders: Record<string, string> = {
     "Content-Type": "application/json",
-    "User-Agent": incoming.get("user-agent") ?? request.headers.get("user-agent") ?? "",
+    "User-Agent":
+      incoming.get("user-agent") ?? request.headers.get("user-agent") ?? "",
   }
   if (clientIP) {
     forwardHeaders["X-Forwarded-For"] = clientIP

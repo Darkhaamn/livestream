@@ -73,7 +73,9 @@ export interface Vod {
 }
 
 export function getVods(path?: string) {
-  return fetchJSON<Vod[]>(`/api/vods${path ? `?path=${encodeURIComponent(path)}` : ""}`)
+  return fetchJSON<Vod[]>(
+    `/api/vods${path ? `?path=${encodeURIComponent(path)}` : ""}`
+  )
 }
 
 export function buildVodUrl(vod: Vod) {

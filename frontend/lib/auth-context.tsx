@@ -1,7 +1,13 @@
-'use client'
+"use client"
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { api, type TokenPair, type User } from './api'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react"
+import { api, type TokenPair, type User } from "./api"
 
 interface AuthState {
   user: User | null
@@ -18,10 +24,10 @@ interface AuthContext extends AuthState {
 
 const Ctx = createContext<AuthContext | null>(null)
 
-const REFRESH_KEY = 'ls_refresh_token'
+const REFRESH_KEY = "ls_refresh_token"
 
 function readInitialAuthState(): AuthState {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return { user: null, accessToken: null, isLoading: true }
   }
 
@@ -46,7 +52,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const rt = localStorage.getItem(REFRESH_KEY)
     if (!rt) return
 
-    api.auth.refresh(rt)
+    api.auth
+      .refresh(rt)
       .then(applyTokens)
       .catch(() => {
         localStorage.removeItem(REFRESH_KEY)
@@ -54,15 +61,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
   }, [applyTokens])
 
-  const login = useCallback(async (email: string, password: string) => {
-    const pair = await api.auth.login(email, password)
-    await applyTokens(pair)
-  }, [applyTokens])
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const pair = await api.auth.login(email, password)
+      await applyTokens(pair)
+    },
+    [applyTokens]
+  )
 
-  const register = useCallback(async (username: string, email: string, password: string) => {
-    const pair = await api.auth.register(username, email, password)
-    await applyTokens(pair)
-  }, [applyTokens])
+  const register = useCallback(
+    async (username: string, email: string, password: string) => {
+      const pair = await api.auth.register(username, email, password)
+      await applyTokens(pair)
+    },
+    [applyTokens]
+  )
 
   const logout = useCallback(async () => {
     const rt = localStorage.getItem(REFRESH_KEY)
@@ -74,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = useCallback(async () => {
     if (!state.accessToken) return
     const user = await api.users.me(state.accessToken)
-    setState(s => ({ ...s, user }))
+    setState((s) => ({ ...s, user }))
   }, [state.accessToken])
 
   return (
@@ -86,6 +99,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const ctx = useContext(Ctx)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider")
   return ctx
 }

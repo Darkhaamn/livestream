@@ -55,22 +55,10 @@ webrtcAdditionalHosts:
 pathDefaults:
   source: publisher
 
-  # Notify API of stream start, then run periodic JPEG snapshots for homepage
-  # thumbnails (requires ffmpeg; mtx-manager also captures)
-  runOnReady: |
-    bash -c '
-    curl -s -X POST http://host.docker.internal:8081/internal/mtx/stream-started -H "Content-Type: application/json" -d "{\"path\":\"$MTX_PATH\"}"
-    command -v ffmpeg >/dev/null || exit 0
-    while [ -n "$MTX_PATH" ]; do
-      mkdir -p "/thumbnails/$(dirname "$MTX_PATH")"
-      ffmpeg -hide_banner -loglevel error -rtsp_transport tcp \
-        -i "rtsp://127.0.0.1:8554/$MTX_PATH" \
-        -frames:v 1 -update 1 -y "/thumbnails/${MTX_PATH}.jpg" 2>/dev/null || true
-      sleep 10
-    done
-    '
-  runOnReadyRestart: no
-  runOnNotReady: curl -s -X POST http://host.docker.internal:8081/internal/mtx/stream-stopped -H 'Content-Type: application/json' -d '{"path":"$MTX_PATH"}'
+  # Live state (is_live) is synced by mtx-manager → API webhooks.
+  # The official image is distroless: no shell/curl for runOnReady hooks.
+  # Thumbnails are captured by mtx-manager's ffmpeg worker.
+
   record: yes
   recordPath: /recordings/%path/%Y/%m/%d/%H-%M-%S
   recordFormat: fmp4

@@ -64,7 +64,7 @@ export function ChatPanel({ className, streamKey }: ChatPanelProps) {
   const socketRef = useRef<ChatSocket | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const [autoScroll, setAutoScroll] = useState(true)
+  const autoScroll = true
 
   useEffect(() => {
     const socket = new ChatSocket(streamKey, accessToken)

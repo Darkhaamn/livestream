@@ -6,17 +6,14 @@ export function useWebRtcLatency(peer: RTCPeerConnection | null) {
   const [latencyMs, setLatencyMs] = useState<number | null>(null)
 
   useEffect(() => {
-    if (!peer) {
-      setLatencyMs(null)
-      return
-    }
+    if (!peer) return
 
+    const connection = peer
     let active = true
 
     async function sample() {
-      if (!peer) return
       try {
-        const stats = await peer.getStats()
+        const stats = await connection.getStats()
         let rttMs: number | null = null
 
         stats.forEach((report) => {
@@ -48,5 +45,5 @@ export function useWebRtcLatency(peer: RTCPeerConnection | null) {
     }
   }, [peer])
 
-  return latencyMs
+  return peer ? latencyMs : null
 }

@@ -21,26 +21,24 @@ type ChannelHeroProps = {
 }
 
 export function ChannelHero({ user, streamKey, isLive, activeVod, onClearVod }: ChannelHeroProps) {
-  const [stream, setStream] = useState<PathSummary | null>(null)
+  const [liveStream, setLiveStream] = useState<PathSummary | null>(null)
+  const stream = isLive ? liveStream : null
   const displayName = user.display_name ?? user.username
   const webRtcPlaybackUrl = buildWebRtcUrl(streamKey)
   const hlsPlaybackUrl = buildHlsUrl(streamKey)
 
   useEffect(() => {
-    if (!isLive) {
-      setStream(null)
-      return
-    }
+    if (!isLive) return
 
     let active = true
     const load = () => {
       if (document.hidden) return
       getPath(streamKey)
         .then(data => {
-          if (active) setStream(data)
+          if (active) setLiveStream(data)
         })
         .catch(() => {
-          if (active) setStream(null)
+          if (active) setLiveStream(null)
         })
     }
     load()

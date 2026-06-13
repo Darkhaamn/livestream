@@ -24,18 +24,15 @@ function ThumbnailFallback({ className }: { className?: string }) {
   )
 }
 
-export function StreamThumbnail({
+function StreamThumbnailInner({
   streamKey,
   className,
-  refreshMs = 15000,
+  refreshMs,
 }: StreamThumbnailProps) {
   const [src, setSrc] = useState(() => buildThumbnailUrl(streamKey))
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
-    setFailed(false)
-    setSrc(buildThumbnailUrl(streamKey))
-
     const timer = window.setInterval(() => {
       if (document.hidden) return
       setSrc(buildThumbnailUrl(streamKey))
@@ -50,6 +47,8 @@ export function StreamThumbnail({
 
   return (
     <>
+      {/* Dynamic live thumbnail URL; next/image not used for polling mtx snapshots */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
         alt=""
@@ -60,4 +59,8 @@ export function StreamThumbnail({
       <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20" />
     </>
   )
+}
+
+export function StreamThumbnail(props: StreamThumbnailProps) {
+  return <StreamThumbnailInner key={props.streamKey} {...props} />
 }

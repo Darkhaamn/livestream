@@ -56,18 +56,12 @@ export function VodList({
   channel: channelProp,
   sessions: sessionsProp,
 }: VodListProps) {
-  const [channel, setChannel] = useState<User | null>(channelProp ?? null)
-  const [sessions, setSessions] = useState<StreamSession[]>(sessionsProp ?? [])
+  const [fetchedChannel, setFetchedChannel] = useState<User | null>(null)
+  const [fetchedSessions, setFetchedSessions] = useState<StreamSession[]>([])
 
   const username = usernameFromStreamKey(streamKey)
-
-  useEffect(() => {
-    if (channelProp !== undefined) setChannel(channelProp)
-  }, [channelProp])
-
-  useEffect(() => {
-    if (sessionsProp !== undefined) setSessions(sessionsProp)
-  }, [sessionsProp])
+  const channel = channelProp !== undefined ? channelProp : fetchedChannel
+  const sessions = sessionsProp !== undefined ? sessionsProp : fetchedSessions
 
   useEffect(() => {
     if (!username || channelProp !== undefined) return
@@ -75,10 +69,10 @@ export function VodList({
     api.users
       .getByUsername(username)
       .then(data => {
-        if (active) setChannel(data)
+        if (active) setFetchedChannel(data)
       })
       .catch(() => {
-        if (active) setChannel(null)
+        if (active) setFetchedChannel(null)
       })
     return () => {
       active = false
@@ -91,10 +85,10 @@ export function VodList({
     api.users
       .sessions(username)
       .then(data => {
-        if (active) setSessions(Array.isArray(data) ? data : [])
+        if (active) setFetchedSessions(Array.isArray(data) ? data : [])
       })
       .catch(() => {
-        if (active) setSessions([])
+        if (active) setFetchedSessions([])
       })
     return () => {
       active = false
@@ -108,7 +102,10 @@ export function VodList({
   }, [sessions])
 
   const onLoadedRef = useRef(onLoaded)
-  onLoadedRef.current = onLoaded
+
+  useEffect(() => {
+    onLoadedRef.current = onLoaded
+  }, [onLoaded])
 
   useEffect(() => {
     onLoadedRef.current?.(recordings.length)

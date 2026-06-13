@@ -25,52 +25,42 @@ type BroadcastStabilityProps = {
 
 export default function BroadcastStability({ streamKey, isLive: isLiveProp }: BroadcastStabilityProps) {
   const { accessToken } = useAuth()
-  const [isLive, setIsLive] = useState(isLiveProp ?? false)
-  const [metricSamples, setMetricSamples] = useState<StreamMetricSample[]>([])
-  const [loading, setLoading] = useState(true)
+  const [polledLive, setPolledLive] = useState(false)
+  const [polledLoading, setPolledLoading] = useState(isLiveProp === undefined)
+  const [fetchedSamples, setFetchedSamples] = useState<StreamMetricSample[]>([])
+
+  const isLive = isLiveProp ?? polledLive
+  const loading = isLiveProp !== undefined ? false : polledLoading
+  const metricSamples = accessToken && isLive ? fetchedSamples : []
 
   useEffect(() => {
-    if (isLiveProp !== undefined) {
-      setIsLive(isLiveProp)
-    }
-  }, [isLiveProp])
+    if (isLiveProp !== undefined) return
 
-  useEffect(() => {
     let active = true
 
     async function load() {
       try {
         const data = await getPath(streamKey)
         if (!active) return
-        if (isLiveProp === undefined) setIsLive(data.online)
+        setPolledLive(data.online)
       } catch {
-        if (!active || isLiveProp !== undefined) return
-        setIsLive(false)
+        if (!active) return
+        setPolledLive(false)
       } finally {
-        if (active) setLoading(false)
+        if (active) setPolledLoading(false)
       }
     }
 
     void load()
-    if (isLiveProp === undefined) {
-      const timer = window.setInterval(() => void load(), 4000)
-      return () => {
-        active = false
-        window.clearInterval(timer)
-      }
-    }
-
-    setLoading(false)
+    const timer = window.setInterval(() => void load(), 4000)
     return () => {
       active = false
+      window.clearInterval(timer)
     }
   }, [streamKey, isLiveProp])
 
   useEffect(() => {
-    if (!accessToken || !isLive) {
-      setMetricSamples([])
-      return
-    }
+    if (!accessToken || !isLive) return
 
     let active = true
 
@@ -79,9 +69,9 @@ export default function BroadcastStability({ streamKey, isLive: isLiveProp }: Br
       try {
         const data = await api.users.streamMetrics(accessToken)
         if (!active) return
-        setMetricSamples(data.samples)
+        setFetchedSamples(data.samples)
       } catch {
-        if (!active) return
+        // keep last samples on transient errors
       }
     }
 

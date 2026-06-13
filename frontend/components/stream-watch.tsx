@@ -41,22 +41,20 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
 
   const channelUsername = streamKey.startsWith("live/") ? streamKey.slice("live/".length) : null
   const isOwnChannel = !!user && !!channelUsername && user.username === channelUsername
+  const canFollow = !!channelUsername && !!accessToken && !isOwnChannel
 
   useEffect(() => {
-    if (!channelUsername || !accessToken || isOwnChannel) {
-      setFollowing(false)
-      return
-    }
+    if (!canFollow || !channelUsername) return
     let active = true
     api.users
       .followStatus(accessToken, channelUsername)
       .then(r => { if (active) setFollowing(r.following) })
       .catch(() => { if (active) setFollowing(false) })
     return () => { active = false }
-  }, [channelUsername, accessToken, isOwnChannel])
+  }, [channelUsername, accessToken, canFollow])
 
   async function toggleFollow() {
-    if (!channelUsername || !accessToken || followBusy) return
+    if (!canFollow || followBusy || !channelUsername) return
     setFollowBusy(true)
     const next = !following
     setFollowing(next)
@@ -71,10 +69,7 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
   }
 
   useEffect(() => {
-    if (!channelUsername) {
-      setChannelUser(null)
-      return
-    }
+    if (!channelUsername) return
     let active = true
     api.users
       .getByUsername(channelUsername)
@@ -90,10 +85,7 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
   }, [channelUsername])
 
   useEffect(() => {
-    if (!channelUsername) {
-      setSessions([])
-      return
-    }
+    if (!channelUsername) return
     let active = true
     const load = () => {
       api.users

@@ -6,12 +6,6 @@ import { useEffect, useRef, useState } from "react"
 import { PlayerOverlay } from "@/components/stream/player-overlay"
 import { cn } from "@/lib/utils"
 
-type PlyrPlayer = {
-  destroy: () => void
-  play: () => void | Promise<void>
-  on: (event: string, callback: () => void) => void
-}
-
 type LivePlyrPlayerProps = {
   src: string
   viewerCount?: number

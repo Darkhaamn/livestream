@@ -97,11 +97,10 @@ export default function ChannelPage({ username }: ChannelPageProps) {
     }
   }, [username])
 
+  const canFollow = !!accessToken && !isOwnChannel
+
   useEffect(() => {
-    if (!accessToken || isOwnChannel) {
-      setFollowing(false)
-      return
-    }
+    if (!canFollow) return
     let active = true
     api.users
       .followStatus(accessToken, username)
@@ -114,10 +113,10 @@ export default function ChannelPage({ username }: ChannelPageProps) {
     return () => {
       active = false
     }
-  }, [username, accessToken, isOwnChannel])
+  }, [username, accessToken, canFollow])
 
   async function toggleFollow() {
-    if (!accessToken || followBusy || isOwnChannel) return
+    if (!canFollow || followBusy) return
     setFollowBusy(true)
     const next = !following
     setFollowing(next)
@@ -304,15 +303,15 @@ export default function ChannelPage({ username }: ChannelPageProps) {
             {!isOwnChannel ? (
               <Button
                 type="button"
-                variant={following ? 'secondary' : 'default'}
+                variant={following && canFollow ? 'secondary' : 'default'}
                 size="lg"
                 className="w-full gap-2 font-bold sm:w-auto"
                 onClick={() => void toggleFollow()}
-                disabled={followBusy || !accessToken}
+                disabled={followBusy || !canFollow}
                 title={!accessToken ? 'Log in to follow' : undefined}
               >
-                <IconHeart className={cn(following && 'fill-current')} />
-                {following ? 'Following' : 'Follow'}
+                <IconHeart className={cn(canFollow && following && 'fill-current')} />
+                {canFollow && following ? 'Following' : 'Follow'}
               </Button>
             ) : null}
           </div>

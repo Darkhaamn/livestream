@@ -20,8 +20,21 @@ const Ctx = createContext<AuthContext | null>(null)
 
 const REFRESH_KEY = 'ls_refresh_token'
 
+function readInitialAuthState(): AuthState {
+  if (typeof window === 'undefined') {
+    return { user: null, accessToken: null, isLoading: true }
+  }
+
+  const refreshToken = localStorage.getItem(REFRESH_KEY)
+  if (!refreshToken) {
+    return { user: null, accessToken: null, isLoading: false }
+  }
+
+  return { user: null, accessToken: null, isLoading: true }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({ user: null, accessToken: null, isLoading: true })
+  const [state, setState] = useState<AuthState>(readInitialAuthState)
 
   const applyTokens = useCallback(async (pair: TokenPair) => {
     localStorage.setItem(REFRESH_KEY, pair.refresh_token)
@@ -31,12 +44,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const rt = localStorage.getItem(REFRESH_KEY)
-    if (!rt) { setState(s => ({ ...s, isLoading: false })); return }
+    if (!rt) return
+
     api.auth.refresh(rt)
       .then(applyTokens)
       .catch(() => {
         localStorage.removeItem(REFRESH_KEY)
-        setState(s => ({ ...s, isLoading: false }))
+        setState({ user: null, accessToken: null, isLoading: false })
       })
   }, [applyTokens])
 

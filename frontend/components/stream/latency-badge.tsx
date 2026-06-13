@@ -20,7 +20,7 @@ type LatencyBadgeProps = {
   className?: string
 }
 
-export function LatencyBadge({ latencyMs, protocol, className }: LatencyBadgeProps) {
+export function LatencyBadge({ latencyMs, className }: LatencyBadgeProps) {
   const level = getLatencyLevel(latencyMs)
   const label = getLatencyLabel(level)
   const ms =

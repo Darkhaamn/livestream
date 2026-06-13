@@ -21,7 +21,7 @@ type WebRtcPlayerProps = {
   suspended?: boolean
 }
 
-export default function WebRtcPlayer({
+function WebRtcPlayerSession({
   src,
   fallbackSrc,
   viewerCount = 0,
@@ -37,28 +37,29 @@ export default function WebRtcPlayer({
   const [connected, setConnected] = useState(false)
   const latencyMs = useWebRtcLatency(peer)
 
-  suspendedRef.current = suspended
+  useEffect(() => {
+    suspendedRef.current = suspended
+  }, [suspended])
 
   useEffect(() => {
-    setUseFallback(false)
-    setError(null)
-    setConnected(false)
-
     const video = videoRef.current
     if (!video) return
 
     let cancelled = false
     const lease = acquireWebRtcSession(src)
     leaseRef.current = lease
-    setPeer(lease.peer)
 
-    video.muted = true
-    video.srcObject = lease.media
+    void Promise.resolve().then(() => {
+      if (cancelled) return
+      setPeer(lease.peer)
+      video.muted = true
+      video.srcObject = lease.media
 
-    if (lease.isConnected()) {
-      setConnected(true)
-      void video.play().catch(() => undefined)
-    }
+      if (lease.isConnected()) {
+        setConnected(true)
+        void video.play().catch(() => undefined)
+      }
+    })
 
     void lease
       .waitConnected()
@@ -83,11 +84,13 @@ export default function WebRtcPlayer({
       cancelled = true
       lease.release()
       leaseRef.current = null
-      setPeer(null)
+      void Promise.resolve().then(() => {
+        setPeer(null)
+        setConnected(false)
+      })
       if (video.srcObject === lease.media) {
         video.srcObject = null
       }
-      setConnected(false)
     }
   }, [src])
 
@@ -141,4 +144,8 @@ export default function WebRtcPlayer({
       ) : null}
     </div>
   )
+}
+
+export default function WebRtcPlayer(props: WebRtcPlayerProps) {
+  return <WebRtcPlayerSession key={props.src} {...props} />
 }

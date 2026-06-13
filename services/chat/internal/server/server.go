@@ -2,12 +2,15 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/darkhanbayarerdenebat/livestream-chat/internal/backplane"
 	"github.com/darkhanbayarerdenebat/livestream-chat/internal/hub"
 	"github.com/darkhanbayarerdenebat/livestream-chat/internal/message"
 	"github.com/darkhanbayarerdenebat/livestream-chat/internal/room"
@@ -18,20 +21,25 @@ import (
 	"nhooyr.io/websocket/wsjson"
 )
 
+// presenceHeartbeat: how often a live connection refreshes its presence entry.
+// Must be well under backplane.PresenceTTLSeconds so entries don't expire while connected.
+const presenceHeartbeat = 20 * time.Second
+
 type Server struct {
 	hub         *hub.Hub
+	bp          backplane.Backplane
 	store       *store.Store
 	jwtSecret   string
 	corsOrigins map[string]bool
 }
 
 // New creates a chat server. st may be nil — chat then runs without history.
-func New(h *hub.Hub, st *store.Store, jwtSecret string, origins []string) *Server {
+func New(h *hub.Hub, bp backplane.Backplane, st *store.Store, jwtSecret string, origins []string) *Server {
 	allowed := make(map[string]bool, len(origins))
 	for _, o := range origins {
 		allowed[o] = true
 	}
-	return &Server{hub: h, store: st, jwtSecret: jwtSecret, corsOrigins: allowed}
+	return &Server{hub: h, bp: bp, store: st, jwtSecret: jwtSecret, corsOrigins: allowed}
 }
 
 // Register attaches the chat routes to the given gin engine.
@@ -56,6 +64,10 @@ func (s *Server) handleWS(c *gin.Context) {
 
 	userID, username := s.extractUser(c.Request)
 	color := message.ColorForUser(userID)
+	// connID uniquely identifies THIS websocket connection for presence — two
+	// tabs from the same user (or two guests) must not collapse to one entry
+	// for chat fan-out, but presence is keyed by connID so counts stay correct.
+	connID := userID + ":" + randomHex(6)
 
 	conn, err := websocket.Accept(c.Writer, c.Request, &websocket.AcceptOptions{
 		OriginPatterns: s.originPatterns(),
@@ -69,10 +81,9 @@ func (s *Server) handleWS(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Hour)
 	defer cancel()
 
-	rm := s.hub.GetOrCreate(roomName)
-	client := room.NewClient(userID, username, color, conn)
+	client := room.NewClient(connID, username, color, conn)
 
-	// Replay recent history to this client only, before joining the room.
+	// Replay durable history to THIS client only (from Postgres), before joining.
 	if s.store != nil {
 		for _, hm := range s.store.History(ctx, roomName, 50) {
 			data, err := json.Marshal(hm)
@@ -85,13 +96,22 @@ func (s *Server) handleWS(c *gin.Context) {
 		}
 	}
 
-	rm.Join(client)
-	defer func() {
-		rm.Leave(client)
-		rm.Broadcast(ctx, message.NewLeave(roomName, userID, username))
-	}()
+	// Join local fan-out + global presence, then announce via the backplane so
+	// every pod (not just this one) sees the join.
+	s.hub.Join(roomName, client)
+	_ = s.bp.PresenceJoin(ctx, roomName, connID)
+	_ = s.bp.Publish(ctx, roomName, message.NewJoin(roomName, userID, username))
 
-	rm.Broadcast(ctx, message.NewJoin(roomName, userID, username))
+	stopHeartbeat := make(chan struct{})
+	go s.heartbeat(ctx, roomName, connID, stopHeartbeat)
+
+	defer func() {
+		close(stopHeartbeat)
+		s.hub.Leave(roomName, client)
+		bg := context.Background()
+		_ = s.bp.PresenceLeave(bg, roomName, connID)
+		_ = s.bp.Publish(bg, roomName, message.NewLeave(roomName, userID, username))
+	}()
 
 	conn.SetReadLimit(512)
 	for {
@@ -107,13 +127,38 @@ func (s *Server) handleWS(c *gin.Context) {
 		if s.store != nil {
 			go s.store.Save(msg)
 		}
-		rm.Broadcast(ctx, msg)
+		// Publish to the backplane only — the room's subscriber delivers it back
+		// to local clients too, giving a single global ordering source (no
+		// double-send, no per-pod ordering divergence).
+		if err := s.bp.Publish(ctx, roomName, msg); err != nil {
+			log.Printf("publish room=%s: %v", roomName, err)
+		}
+	}
+}
+
+func (s *Server) heartbeat(ctx context.Context, room, connID string, stop <-chan struct{}) {
+	t := time.NewTicker(presenceHeartbeat)
+	defer t.Stop()
+	for {
+		select {
+		case <-t.C:
+			_ = s.bp.PresenceRefresh(ctx, room, connID)
+		case <-stop:
+			return
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
 func (s *Server) handleCount(c *gin.Context) {
 	roomName := strings.TrimPrefix(c.Param("room"), "/")
-	c.JSON(http.StatusOK, gin.H{"count": s.hub.RoomCount(roomName)})
+	n, err := s.bp.PresenceCount(c.Request.Context(), roomName)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"count": 0})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"count": n})
 }
 
 func (s *Server) extractUser(r *http.Request) (id, username string) {
@@ -122,21 +167,40 @@ func (s *Server) extractUser(r *http.Request) (id, username string) {
 		token = r.URL.Query().Get("token")
 	}
 	if token == "" {
-		return anonID(r), "Guest_" + anonID(r)[:6]
+		return guestIdentity()
 	}
 	t, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
 		return []byte(s.jwtSecret), nil
 	})
 	if err != nil || !t.Valid {
-		return anonID(r), "Guest_" + anonID(r)[:6]
+		return guestIdentity()
 	}
-	claims := t.Claims.(jwt.MapClaims)
+	claims, ok := t.Claims.(jwt.MapClaims)
+	if !ok {
+		return guestIdentity()
+	}
 	uid, _ := claims["uid"].(string)
 	uname, _ := claims["username"].(string)
 	if uid == "" {
-		return anonID(r), "Guest_" + anonID(r)[:6]
+		return guestIdentity()
 	}
 	return uid, uname
+}
+
+// guestIdentity returns a random, per-connection guest id. Random (not
+// IP-derived) so that behind a load balancer or CDN — where many clients share
+// a forwarded IP — guests don't collide onto one id or get spoofed.
+func guestIdentity() (id, username string) {
+	g := randomHex(5)
+	return "guest_" + g, "Guest_" + g
+}
+
+func randomHex(n int) string {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return "000000000000"[:n*2]
+	}
+	return hex.EncodeToString(b)
 }
 
 // originPatterns converts allowed origins to host patterns —
@@ -157,21 +221,4 @@ func bearerToken(r *http.Request) string {
 		return ""
 	}
 	return strings.TrimPrefix(v, "Bearer ")
-}
-
-func anonID(r *http.Request) string {
-	ip := r.RemoteAddr
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		ip = strings.Split(xff, ",")[0]
-	}
-	sum := 0
-	for _, c := range ip {
-		sum += int(c)
-	}
-	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-	result := make([]byte, 8)
-	for i := range result {
-		result[i] = chars[(sum+i*7)%len(chars)]
-	}
-	return string(result)
 }

@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/darkhanbayarerdenebat/livestream-chat/internal/backplane"
 	"github.com/darkhanbayarerdenebat/livestream-chat/internal/config"
 	"github.com/darkhanbayarerdenebat/livestream-chat/internal/hub"
 	"github.com/darkhanbayarerdenebat/livestream-chat/internal/server"
@@ -35,8 +36,20 @@ func main() {
 		log.Println("chat history store ready")
 	}
 
-	h := hub.New()
-	srv := server.New(h, st, cfg.JWTSecret, cfg.CORSOrigins)
+	// Redis backplane lets chat run on many pods (cross-pod fan-out + global
+	// presence). Falls back to a single-process local backplane for dev.
+	var bp backplane.Backplane
+	if rb, err := backplane.NewRedis(cfg.RedisURL); err != nil {
+		log.Printf("redis backplane unavailable: %v (falling back to single-node local)", err)
+		bp = backplane.NewLocal()
+	} else {
+		log.Println("redis chat backplane ready")
+		bp = rb
+	}
+	defer bp.Close()
+
+	h := hub.New(bp)
+	srv := server.New(h, bp, st, cfg.JWTSecret, cfg.CORSOrigins)
 
 	r := gin.New()
 	r.Use(gin.Recovery())

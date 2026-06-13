@@ -9,6 +9,7 @@ type Config struct {
 	ServerAddr  string
 	JWTSecret   string
 	DatabaseURL string
+	RedisURL    string
 	CORSOrigins []string
 }
 
@@ -17,6 +18,7 @@ func Load() Config {
 		ServerAddr:  getEnv("CHAT_ADDR", ":8082"),
 		JWTSecret:   getEnv("JWT_SECRET", "change-me-in-production-secret-32chars"),
 		DatabaseURL: getEnv("DATABASE_URL", "postgres://livestream:livestream_secret@localhost:5432/livestream"),
+		RedisURL:    getEnv("REDIS_URL", "redis://:redis_secret@localhost:6379/0"),
 		CORSOrigins: strings.Split(getEnv("CORS_ORIGINS", "http://localhost:3000"), ","),
 	}
 }

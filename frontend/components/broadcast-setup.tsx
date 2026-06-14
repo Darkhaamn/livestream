@@ -376,6 +376,14 @@ export default function BroadcastSetup() {
                       in OBS. Your dashboard will switch to Live within a few
                       seconds.
                     </p>
+                    <p className="text-sm text-muted-foreground">
+                      In OBS, confirm the{" "}
+                      <strong className="font-medium text-foreground">
+                        Audio Mixer
+                      </strong>{" "}
+                      is not muted and your mic/desktop sources are included in
+                      the stream output.
+                    </p>
                   </SetupStep>
                 </CardContent>
               </Card>

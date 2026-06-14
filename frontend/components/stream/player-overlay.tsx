@@ -9,13 +9,14 @@ import {
 } from "@tabler/icons-react"
 import { useCallback, useEffect, useState } from "react"
 
-import { LiveBadge } from "@/components/stream/live-badge"
 import { LatencyBadge } from "@/components/stream/latency-badge"
+import { LiveBadge } from "@/components/stream/live-badge"
 import { formatViewerCount } from "@/lib/stream-health"
 import { cn } from "@/lib/utils"
 
 type PlayerOverlayProps = {
   videoRef: React.RefObject<HTMLVideoElement | null>
+  getAudioElement?: () => HTMLAudioElement | null
   viewerCount?: number
   latencyMs: number | null
   protocol?: "webrtc" | "hls"
@@ -25,6 +26,7 @@ type PlayerOverlayProps = {
 
 export function PlayerOverlay({
   videoRef,
+  getAudioElement,
   viewerCount = 0,
   latencyMs,
   protocol,
@@ -40,7 +42,9 @@ export function PlayerOverlay({
     if (!video) return
 
     const sync = () => {
-      setMuted(video.muted)
+      const audio = getAudioElement?.() ?? null
+      const isMuted = audio?.muted ?? video.muted
+      setMuted(isMuted)
       setPlaying(!video.paused)
     }
 
@@ -54,7 +58,7 @@ export function PlayerOverlay({
       video.removeEventListener("play", sync)
       video.removeEventListener("pause", sync)
     }
-  }, [videoRef])
+  }, [getAudioElement, videoRef])
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current
@@ -68,12 +72,47 @@ export function PlayerOverlay({
     }
   }, [videoRef])
 
+  const enableAudio = useCallback(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    video.muted = false
+    video.volume = 1
+
+    const audio = getAudioElement?.() ?? null
+    if (audio) {
+      audio.muted = false
+      audio.volume = 1
+      for (const track of audio.srcObject instanceof MediaStream
+        ? audio.srcObject.getAudioTracks()
+        : []) {
+        track.enabled = true
+      }
+      void audio.play().catch(() => undefined)
+    }
+
+    setMuted(false)
+    void video.play().catch(() => undefined)
+  }, [getAudioElement, videoRef])
+
   const toggleMute = useCallback(() => {
     const video = videoRef.current
     if (!video) return
-    video.muted = !video.muted
-    setMuted(video.muted)
-  }, [videoRef])
+    if (video.muted) {
+      enableAudio()
+      return
+    }
+    video.muted = true
+    const audio = getAudioElement?.() ?? null
+    if (audio) audio.muted = true
+    setMuted(true)
+  }, [getAudioElement, videoRef, enableAudio])
+
+  const unmuteFromGesture = useCallback(() => {
+    const video = videoRef.current
+    if (!video || !video.muted) return
+    enableAudio()
+  }, [enableAudio, videoRef])
 
   const toggleFullscreen = useCallback(() => {
     const video = videoRef.current
@@ -93,6 +132,7 @@ export function PlayerOverlay({
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => setShowControls(false)}
       onTouchStart={() => setShowControls(true)}
+      onClick={unmuteFromGesture}
     >
       {/* Top badges — always visible, non-blocking */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-3">
@@ -109,15 +149,21 @@ export function PlayerOverlay({
         />
       </div>
 
-      {/* Subtle unmute pill — bottom-left, not center */}
+      {/* Prominent unmute — browsers require muted autoplay until user gesture */}
       {muted ? (
         <button
           type="button"
-          onClick={toggleMute}
-          className="pointer-events-auto absolute bottom-14 left-3 flex items-center gap-1.5 rounded bg-black/75 px-2.5 py-1.5 text-xs font-medium text-white backdrop-blur-sm transition hover:bg-black/90"
+          onClick={(event) => {
+            event.stopPropagation()
+            unmuteFromGesture()
+          }}
+          className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-black/35 backdrop-blur-[1px]"
+          aria-label="Unmute stream"
         >
-          <IconVolume className="size-3.5" />
-          Unmute
+          <span className="flex items-center gap-2 rounded-full bg-black/85 px-5 py-3 text-sm font-semibold text-white shadow-lg ring-1 ring-white/20 transition hover:bg-black">
+            <IconVolume className="size-5" />
+            Click for sound
+          </span>
         </button>
       ) : null}
 
@@ -131,7 +177,10 @@ export function PlayerOverlay({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={togglePlay}
+            onClick={(event) => {
+              event.stopPropagation()
+              togglePlay()
+            }}
             className="rounded p-1.5 text-white transition hover:bg-white/15"
             aria-label={playing ? "Pause" : "Play"}
           >
@@ -143,7 +192,10 @@ export function PlayerOverlay({
           </button>
           <button
             type="button"
-            onClick={toggleMute}
+            onClick={(event) => {
+              event.stopPropagation()
+              toggleMute()
+            }}
             className="rounded p-1.5 text-white transition hover:bg-white/15"
             aria-label={muted ? "Unmute" : "Mute"}
           >
@@ -156,7 +208,10 @@ export function PlayerOverlay({
           <div className="flex-1" />
           <button
             type="button"
-            onClick={toggleFullscreen}
+            onClick={(event) => {
+              event.stopPropagation()
+              toggleFullscreen()
+            }}
             className="rounded p-1.5 text-white transition hover:bg-white/15"
             aria-label="Fullscreen"
           >

@@ -1,3 +1,5 @@
+type MediaListener = (stream: MediaStream) => void
+
 type ManagedSession = {
   src: string
   peer: RTCPeerConnection
@@ -8,6 +10,7 @@ type ManagedSession = {
   releaseTimer: ReturnType<typeof setTimeout> | null
   connectPromise: Promise<void>
   abortController: AbortController
+  mediaListeners: Set<MediaListener>
 }
 
 const sessions = new Map<string, ManagedSession>()
@@ -54,6 +57,67 @@ function waitForIceGathering(peer: RTCPeerConnection) {
   })
 }
 
+/** Chrome needs stereo Opus in offer + answer SDP or playback can be silent. */
+function patchStereoOpus(sdp: string) {
+  const sections = sdp.split("m=")
+
+  for (let i = 1; i < sections.length; i++) {
+    if (!sections[i].startsWith("audio")) continue
+
+    const lines = sections[i].split(/\r?\n/)
+    let opusPayloadFormat = ""
+
+    for (const line of lines) {
+      if (line.startsWith("a=rtpmap:") && line.toLowerCase().includes("opus/")) {
+        opusPayloadFormat = line.slice("a=rtpmap:".length).split(" ")[0]
+        break
+      }
+    }
+
+    if (!opusPayloadFormat) break
+
+    let fmtpIndex = -1
+    for (let j = 0; j < lines.length; j++) {
+      if (lines[j].startsWith(`a=fmtp:${opusPayloadFormat} `)) {
+        fmtpIndex = j
+        if (!lines[j].includes("stereo=1")) {
+          lines[j] += ";stereo=1"
+        }
+        if (!lines[j].includes("sprop-stereo=1")) {
+          lines[j] += ";sprop-stereo=1"
+        }
+      }
+    }
+
+    if (fmtpIndex === -1) {
+      const rtpmapIndex = lines.findIndex(
+        (line) =>
+          line.startsWith("a=rtpmap:") &&
+          line.toLowerCase().includes("opus/")
+      )
+      if (rtpmapIndex >= 0) {
+        lines.splice(
+          rtpmapIndex + 1,
+          0,
+          `a=fmtp:${opusPayloadFormat} stereo=1;sprop-stereo=1;minptime=10;useinbandfec=1`
+        )
+      }
+    }
+
+    sections[i] = lines.join("\r\n")
+    break
+  }
+
+  return sections.join("m=")
+}
+
+function notifyMedia(entry: ManagedSession, stream: MediaStream) {
+  entry.media = stream
+  for (const listener of entry.mediaListeners) {
+    listener(stream)
+  }
+}
+
 function destroySession(entry: ManagedSession) {
   if (entry.releaseTimer) {
     clearTimeout(entry.releaseTimer)
@@ -63,6 +127,7 @@ function destroySession(entry: ManagedSession) {
   entry.abortController.abort()
   const sessionUrl = entry.sessionUrl
   entry.sessionUrl = null
+  entry.mediaListeners.clear()
   sessions.delete(entry.src)
 
   if (sessionUrl) {
@@ -74,13 +139,19 @@ function destroySession(entry: ManagedSession) {
 }
 
 async function connectSession(entry: ManagedSession) {
-  const { peer, media, abortController, src } = entry
+  const { peer, abortController, src } = entry
 
   peer.addTransceiver("video", { direction: "recvonly" })
   peer.addTransceiver("audio", { direction: "recvonly" })
 
   peer.addEventListener("track", (event) => {
-    media.addTrack(event.track)
+    const stream = event.streams[0]
+    if (stream) {
+      notifyMedia(entry, stream)
+    } else {
+      entry.media.addTrack(event.track)
+      notifyMedia(entry, entry.media)
+    }
     entry.connected = true
   })
 
@@ -91,6 +162,7 @@ async function connectSession(entry: ManagedSession) {
   })
 
   const offer = await peer.createOffer()
+  offer.sdp = patchStereoOpus(offer.sdp ?? "")
   await peer.setLocalDescription(offer)
   await waitForIceGathering(peer)
 
@@ -118,7 +190,10 @@ async function connectSession(entry: ManagedSession) {
   }
 
   const answer = await response.text()
-  await peer.setRemoteDescription({ type: "answer", sdp: answer })
+  await peer.setRemoteDescription({
+    type: "answer",
+    sdp: patchStereoOpus(answer),
+  })
 
   await new Promise<void>((resolve, reject) => {
     if (entry.connected) {
@@ -166,6 +241,7 @@ function createSession(src: string): ManagedSession {
     releaseTimer: null,
     abortController,
     connectPromise: Promise.resolve(),
+    mediaListeners: new Set(),
   }
 
   entry.connectPromise = connectSession(entry).catch((err) => {
@@ -181,10 +257,14 @@ export type WebRtcLease = {
   peer: RTCPeerConnection
   waitConnected: () => Promise<void>
   isConnected: () => boolean
+  onMediaStream: (listener: MediaListener) => () => void
   release: () => void
 }
 
-export function acquireWebRtcSession(src: string): WebRtcLease {
+export function acquireWebRtcSession(
+  src: string,
+  onMediaStream?: MediaListener
+): WebRtcLease {
   const existing = sessions.get(src)
   if (existing) {
     if (existing.releaseTimer) {
@@ -192,24 +272,40 @@ export function acquireWebRtcSession(src: string): WebRtcLease {
       existing.releaseTimer = null
     }
     existing.refCount += 1
-    return {
-      media: existing.media,
-      peer: existing.peer,
-      waitConnected: () => existing.connectPromise,
-      isConnected: () => existing.connected,
-      release: () => releaseWebRtcSession(src),
+    if (onMediaStream) {
+      existing.mediaListeners.add(onMediaStream)
+      if (existing.media.getTracks().length > 0) {
+        onMediaStream(existing.media)
+      }
     }
+    return leaseFromEntry(existing)
   }
 
   const entry = createSession(src)
   sessions.set(src, entry)
+  if (onMediaStream) {
+    entry.mediaListeners.add(onMediaStream)
+  }
 
+  return leaseFromEntry(entry)
+}
+
+function leaseFromEntry(entry: ManagedSession): WebRtcLease {
   return {
     media: entry.media,
     peer: entry.peer,
     waitConnected: () => entry.connectPromise,
     isConnected: () => entry.connected,
-    release: () => releaseWebRtcSession(src),
+    onMediaStream: (listener) => {
+      entry.mediaListeners.add(listener)
+      if (entry.media.getTracks().length > 0) {
+        listener(entry.media)
+      }
+      return () => {
+        entry.mediaListeners.delete(listener)
+      }
+    },
+    release: () => releaseWebRtcSession(entry.src),
   }
 }
 

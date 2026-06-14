@@ -1,0 +1,36 @@
+FROM node:22-alpine AS deps
+WORKDIR /app
+RUN corepack enable
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+FROM node:22-alpine AS build
+WORKDIR /app
+RUN corepack enable
+COPY --from=deps /app/node_modules ./node_modules
+COPY frontend/ ./
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_MTX_API_URL
+ARG NEXT_PUBLIC_HLS_PLAYBACK_BASE
+ARG NEXT_PUBLIC_MEDIA_CDN_BASE
+ARG NEXT_PUBLIC_LIVE_PLAYBACK=hls
+ARG NEXT_PUBLIC_CHAT_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_MTX_API_URL=$NEXT_PUBLIC_MTX_API_URL
+ENV NEXT_PUBLIC_HLS_PLAYBACK_BASE=$NEXT_PUBLIC_HLS_PLAYBACK_BASE
+ENV NEXT_PUBLIC_MEDIA_CDN_BASE=$NEXT_PUBLIC_MEDIA_CDN_BASE
+ENV NEXT_PUBLIC_LIVE_PLAYBACK=$NEXT_PUBLIC_LIVE_PLAYBACK
+ENV NEXT_PUBLIC_CHAT_URL=$NEXT_PUBLIC_CHAT_URL
+ENV MTX_API_URL=http://mtx-manager:8080
+RUN pnpm build
+
+FROM node:22-alpine
+WORKDIR /app
+RUN corepack enable
+ENV NODE_ENV=production
+COPY --from=build /app/.next ./.next
+COPY --from=build /app/public ./public
+COPY --from=build /app/package.json ./
+COPY --from=build /app/node_modules ./node_modules
+EXPOSE 3000
+CMD ["pnpm", "start"]

@@ -1,0 +1,167 @@
+# Production stack for a single EC2 instance.
+# Usage: cd deploy && docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    restart: unless-stopped
+    volumes:
+      - ./mediamtx.docker.yml:/mediamtx.yml:ro
+      - media_recordings:/recordings
+    depends_on:
+      api:
+        condition: service_started
+    # RTMP + WebRTC ICE need host ports; HLS is internal (nginx → CloudFront origin)
+    ports:
+      - "1935:1935"
+      - "8889:8889"
+      - "8189:8189/udp"
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.api
+    restart: unless-stopped
+    environment:
+      SERVER_ADDR: ":8081"
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGINS: ${APP_URL}
+      MEDIAMTX_URL: http://mediamtx:9997
+      CHAT_URL: ${CHAT_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  chat:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.chat
+    restart: unless-stopped
+    environment:
+      SERVER_ADDR: ":8082"
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      CORS_ORIGINS: ${APP_URL}
+      GIN_MODE: release
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  mtx-manager:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.mtx-manager
+    restart: unless-stopped
+    environment:
+      SERVER_ADDR: ":8080"
+      MEDIAMTX_URL: http://mediamtx:9997
+      API_URL: ${API_URL}
+      REDIS_URL: ${REDIS_URL}
+      CORS_ORIGINS: ${APP_URL}
+      RECORDINGS_DIR: /data/recordings
+      THUMBNAIL_DIR: /data/thumbnails
+      RTMP_INGEST_URL: ${RTMP_INGEST_URL}
+      HLS_PLAYBACK_URL: ${CDN_HLS_URL}
+      WEBRTC_PLAYBACK_URL: ${APP_URL}/webrtc
+      LIVE_SYNC_INTERVAL: 3s
+      METRICS_SAMPLE_INTERVAL: 5s
+    volumes:
+      - media_recordings:/data/recordings
+      - media_thumbnails:/data/thumbnails
+    depends_on:
+      - mediamtx
+      - api
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_MTX_API_URL: ${NEXT_PUBLIC_MTX_API_URL}
+        NEXT_PUBLIC_HLS_PLAYBACK_BASE: ${CDN_HLS_URL}
+        NEXT_PUBLIC_MEDIA_CDN_BASE: ${CDN_MEDIA_URL}
+        NEXT_PUBLIC_LIVE_PLAYBACK: hls
+        NEXT_PUBLIC_CHAT_URL: ${NEXT_PUBLIC_CHAT_URL}
+    restart: unless-stopped
+    environment:
+      MTX_API_URL: http://mtx-manager:8080
+    depends_on:
+      - mtx-manager
+      - api
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    environment:
+      APP_HOST: ${APP_HOST:-app.example.com}
+      ORIGIN_VERIFY_SECRET: ${ORIGIN_VERIFY_SECRET}
+    depends_on:
+      - frontend
+      - mtx-manager
+      - mediamtx
+
+  s3-sync:
+    image: amazon/aws-cli:2.22.35
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          /scripts/s3-sync.sh
+          sleep 60
+        done
+    environment:
+      AWS_REGION: ${AWS_REGION}
+      S3_BUCKET: ${S3_BUCKET}
+    volumes:
+      - media_recordings:/data/recordings:ro
+      - media_thumbnails:/data/thumbnails:ro
+      - ./scripts/s3-sync.sh:/scripts/s3-sync.sh:ro
+    depends_on:
+      - mtx-manager
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_recordings:
+  media_thumbnails:

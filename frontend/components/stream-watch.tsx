@@ -10,7 +10,7 @@ import { VodList } from "@/components/stream/vod-list"
 import { VodPlayer } from "@/components/stream/vod-player"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import WebRtcPlayer from "@/components/webrtc-player"
+import { LivePlayer } from "@/components/stream/live-player"
 import { ChannelAvatar } from "@/components/stream/channel-avatar"
 import { useViewerPresence } from "@/hooks/use-viewer-presence"
 import { api, type StreamSession, type User } from "@/lib/api"
@@ -20,7 +20,7 @@ import { parseStreamDisplay } from "@/lib/display-stream"
 import { buildVodUrl, getPath, type Vod } from "@/lib/mtx-api"
 import type { PathSummary } from "@/lib/mtx-types"
 import { formatViewerCount, getStreamResolution } from "@/lib/stream-health"
-import { buildHlsUrl, buildWebRtcUrl, buildVodThumbnailUrl } from "@/lib/stream"
+import { buildVodThumbnailUrl } from "@/lib/stream"
 import { cn } from "@/lib/utils"
 
 type StreamWatchProps = {
@@ -178,8 +178,6 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
     }
   }, [streamKey])
 
-  const hlsPlaybackUrl = buildHlsUrl(streamKey)
-  const webRtcPlaybackUrl = buildWebRtcUrl(streamKey)
   const resolution = getStreamResolution(stream)
   const viewerCount = stream?.viewerCount ?? 0
   const isLive = stream?.online ?? false
@@ -219,9 +217,8 @@ export default function StreamWatch({ streamKey }: StreamWatchProps) {
                 )}
                 aria-hidden={!!activeVod}
               >
-                <WebRtcPlayer
-                  src={webRtcPlaybackUrl}
-                  fallbackSrc={hlsPlaybackUrl}
+                <LivePlayer
+                  streamKey={streamKey}
                   viewerCount={viewerCount}
                   className="h-full w-full rounded-none"
                   suspended={!!activeVod}

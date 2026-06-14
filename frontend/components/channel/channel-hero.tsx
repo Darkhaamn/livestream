@@ -4,12 +4,12 @@ import { IconBroadcast, IconPlayerPlay } from "@tabler/icons-react"
 import { useEffect, useState } from "react"
 
 import { VodPlayer } from "@/components/stream/vod-player"
-import WebRtcPlayer from "@/components/webrtc-player"
+import { LivePlayer } from "@/components/stream/live-player"
 import { useViewerPresence } from "@/hooks/use-viewer-presence"
 import type { User } from "@/lib/api"
 import { buildVodUrl, getPath, type Vod } from "@/lib/mtx-api"
 import type { PathSummary } from "@/lib/mtx-types"
-import { buildHlsUrl, buildWebRtcUrl, buildVodThumbnailUrl } from "@/lib/stream"
+import { buildVodThumbnailUrl } from "@/lib/stream"
 import { cn } from "@/lib/utils"
 
 type ChannelHeroProps = {
@@ -30,8 +30,6 @@ export function ChannelHero({
   const [liveStream, setLiveStream] = useState<PathSummary | null>(null)
   const stream = isLive ? liveStream : null
   const displayName = user.display_name ?? user.username
-  const webRtcPlaybackUrl = buildWebRtcUrl(streamKey)
-  const hlsPlaybackUrl = buildHlsUrl(streamKey)
 
   useEffect(() => {
     if (!isLive) return
@@ -75,9 +73,8 @@ export function ChannelHero({
           )}
           aria-hidden={!!activeVod}
         >
-          <WebRtcPlayer
-            src={webRtcPlaybackUrl}
-            fallbackSrc={hlsPlaybackUrl}
+          <LivePlayer
+            streamKey={streamKey}
             viewerCount={stream?.viewerCount ?? 0}
             className="h-full w-full rounded-none"
             suspended={!!activeVod}

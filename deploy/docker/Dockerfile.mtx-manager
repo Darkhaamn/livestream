@@ -1,0 +1,12 @@
+FROM golang:1.25-alpine AS build
+WORKDIR /src
+COPY services/mtx-manager/go.mod services/mtx-manager/go.sum ./
+RUN go mod download
+COPY services/mtx-manager/ ./
+RUN CGO_ENABLED=0 go build -o /mtx-manager ./cmd/mtx-manager
+
+FROM alpine:3.21
+RUN apk add --no-cache ca-certificates ffmpeg
+COPY --from=build /mtx-manager /usr/local/bin/mtx-manager
+EXPOSE 8080
+CMD ["mtx-manager"]

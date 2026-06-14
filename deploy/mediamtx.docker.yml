@@ -1,0 +1,40 @@
+logLevel: info
+
+api: yes
+apiAddress: :9997
+
+metrics: yes
+metricsAddress: :9998
+
+authMethod: http
+authHTTPAddress: http://api:8081/internal/mtx/auth
+authHTTPExclude:
+  - action: api
+  - action: metrics
+  - action: pprof
+
+hls: yes
+hlsAddress: :8888
+hlsTrustedProxies:
+  - 127.0.0.1
+  - 172.16.0.0/12
+  - 10.0.0.0/8
+
+hlsVariant: mpegts
+hlsSegmentCount: 6
+hlsSegmentDuration: 2s
+
+webrtc: yes
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :8189
+
+pathDefaults:
+  source: publisher
+  record: yes
+  recordPath: /recordings/%path/%Y/%m/%d/%H-%M-%S
+  recordFormat: fmp4
+  recordSegmentDuration: 1h
+  recordDeleteAfter: 0s
+
+paths:
+  all_others:

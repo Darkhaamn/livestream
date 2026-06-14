@@ -79,5 +79,9 @@ export function getVods(path?: string) {
 }
 
 export function buildVodUrl(vod: Vod) {
+  const mediaCdn = process.env.NEXT_PUBLIC_MEDIA_CDN_BASE
+  if (mediaCdn) {
+    return `${mediaCdn.replace(/\/+$/, "")}/recordings/${vod.id}`
+  }
   return `${API_BASE}${vod.url}`
 }
